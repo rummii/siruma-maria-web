@@ -19,7 +19,11 @@ RUN git clone https://github.com/bytedance/LatentSync.git latentsync \
 WORKDIR /opt/latentsync
 RUN python3 -m pip install --upgrade pip setuptools wheel \
     && python3 -m pip install -r requirements.txt \
-    && python3 -m pip install fastapi==0.115.12 uvicorn==0.34.2 python-multipart==0.0.20
+    && python3 -m pip install \
+        fastapi==0.115.12 \
+        uvicorn==0.34.2 \
+        python-multipart==0.0.20 \
+        google-cloud-storage==3.1.0
 
 RUN mkdir -p checkpoints/whisper /opt/hf-cache /opt/torch-cache \
     && huggingface-cli download ByteDance/LatentSync-1.6 latentsync_unet.pt --local-dir checkpoints \
@@ -30,6 +34,7 @@ RUN mkdir -p checkpoints/whisper /opt/hf-cache /opt/torch-cache \
 
 COPY public/maria-veo-idle.mp4 /opt/maria/maria-veo-idle.mp4
 COPY services/latentsync/server.py /opt/latentsync/server.py
+COPY services/latentsync/job.py /opt/latentsync/job.py
 
 EXPOSE 8080
 CMD ["bash", "-lc", "uvicorn server:app --host 0.0.0.0 --port ${PORT}"]
