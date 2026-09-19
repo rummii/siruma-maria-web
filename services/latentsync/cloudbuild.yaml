@@ -5,10 +5,10 @@ steps:
       - --file
       - services/latentsync/Dockerfile
       - --tag
-      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:$SHORT_SHA
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:candidate
       - .
 images:
-  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:$SHORT_SHA
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:candidate
 options:
   machineType: E2_HIGHCPU_8
   diskSizeGb: 200
