@@ -32,10 +32,14 @@ RUN mkdir -p checkpoints/whisper /opt/hf-cache /opt/torch-cache \
     && test -s checkpoints/latentsync_unet.pt \
     && test -s checkpoints/whisper/tiny.pt
 
-# google-cloud-storage can select protobuf 7, while MediaPipe requires protobuf <4.
-# Keep this correction after the model layer so rebuilds reuse downloaded weights.
-RUN python3 -m pip install --force-reinstall "protobuf==3.20.3" \
-    && python3 -m pip check
+# The job uses dependency-free REST calls for Cloud Storage. Remove the temporary
+# Google client stack, restore MediaPipe's protobuf constraint, and verify imports.
+# Keeping this correction after the model layer lets rebuilds reuse downloaded weights.
+RUN python3 -m pip uninstall -y \
+        google-cloud-storage google-cloud-core google-api-core \
+        googleapis-common-protos proto-plus google-crc32c google-resumable-media \
+    && python3 -m pip install --force-reinstall "protobuf==3.20.3" \
+    && python3 -c "import mediapipe, google.protobuf; from packaging.version import Version; assert Version(google.protobuf.__version__) < Version('4'); print('MediaPipe protobuf:', google.protobuf.__version__)"
 
 COPY public/maria-veo-idle.mp4 /opt/maria/maria-veo-idle.mp4
 COPY services/latentsync/server.py /opt/latentsync/server.py
