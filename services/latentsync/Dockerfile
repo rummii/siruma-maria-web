@@ -23,7 +23,9 @@ RUN python3 -m pip install --upgrade pip setuptools wheel \
         fastapi==0.115.12 \
         uvicorn==0.34.2 \
         python-multipart==0.0.20 \
-        google-cloud-storage==3.1.0
+        google-cloud-storage==3.1.0 \
+        protobuf==3.20.3 \
+    && python3 -m pip check
 
 RUN mkdir -p checkpoints/whisper /opt/hf-cache /opt/torch-cache \
     && huggingface-cli download ByteDance/LatentSync-1.6 latentsync_unet.pt --local-dir checkpoints \
