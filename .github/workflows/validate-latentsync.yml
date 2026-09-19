@@ -1,0 +1,41 @@
+name: Validate LatentSync integration
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Build Maria web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  latentsync-job:
+    name: Validate LatentSync GPU job
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: python -m py_compile services/latentsync/server.py services/latentsync/job.py
+      - name: Validate required job files
+        run: |
+          test -s services/latentsync/Dockerfile
+          test -s services/latentsync/cloudbuild.yaml
+          test -s services/latentsync/job.py
+          test -s public/maria-veo-idle.mp4

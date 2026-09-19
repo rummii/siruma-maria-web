@@ -21,9 +21,14 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [preparingLipSync, setPreparingLipSync] = useState(false);
+  const [lipSyncVideo, setLipSyncVideo] = useState<string | null>(null);
   const [voiceName, setVoiceName] = useState("Google Filipino female");
   const chatBox = useRef<HTMLDivElement>(null);
+  const mariaVideo = useRef<HTMLVideoElement>(null);
   const currentAudio = useRef<HTMLAudioElement | null>(null);
+  const currentAudioUrl = useRef<string | null>(null);
+  const currentLipSyncUrl = useRef<string | null>(null);
 
   useEffect(() => {
     const panel = chatBox.current;
@@ -34,9 +39,57 @@ export default function Home() {
     return () => window.cancelAnimationFrame(frame);
   }, [messages]);
 
-  async function speak(text: string) {
+  useEffect(() => {
+    if (!lipSyncVideo) return;
+    const video = mariaVideo.current;
+    const audio = currentAudio.current;
+    if (!video || !audio) return;
+
+    video.currentTime = 0;
+    audio.currentTime = 0;
+    void Promise.allSettled([video.play(), audio.play()]);
+  }, [lipSyncVideo]);
+
+  useEffect(() => {
+    return () => {
+      currentAudio.current?.pause();
+      if (currentAudioUrl.current) URL.revokeObjectURL(currentAudioUrl.current);
+      if (currentLipSyncUrl.current) URL.revokeObjectURL(currentLipSyncUrl.current);
+    };
+  }, []);
+
+  function clearMedia() {
     currentAudio.current?.pause();
+    currentAudio.current = null;
+    if (currentAudioUrl.current) {
+      URL.revokeObjectURL(currentAudioUrl.current);
+      currentAudioUrl.current = null;
+    }
+    if (currentLipSyncUrl.current) {
+      URL.revokeObjectURL(currentLipSyncUrl.current);
+      currentLipSyncUrl.current = null;
+    }
+    setLipSyncVideo(null);
+  }
+
+  function finishSpeaking() {
+    clearMedia();
+    setPreparingLipSync(false);
+    setSpeaking(false);
+  }
+
+  async function playVoiceOnly(audio: HTMLAudioElement) {
+    setPreparingLipSync(false);
+    audio.onended = finishSpeaking;
+    audio.onerror = finishSpeaking;
+    await audio.play();
+  }
+
+  async function speak(text: string) {
+    clearMedia();
     setSpeaking(true);
+    setPreparingLipSync(true);
+
     try {
       const response = await fetch("/api/tts", {
         method: "POST",
@@ -44,17 +97,32 @@ export default function Home() {
         body: JSON.stringify({ text }),
       });
       if (!response.ok) throw new Error("Voice request failed");
-      const audio = new Audio(URL.createObjectURL(await response.blob()));
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
       currentAudio.current = audio;
+      currentAudioUrl.current = audioUrl;
       setVoiceName(response.headers.get("X-Maria-Voice") || "Google Filipino female");
-      const stopSpeaking = () => {
-        setSpeaking(false);
-      };
-      audio.onended = stopSpeaking;
-      audio.onerror = stopSpeaking;
-      await audio.play();
+
+      try {
+        const body = new FormData();
+        body.set("audio", audioBlob, "maria-speech.mp3");
+        const lipSyncResponse = await fetch("/api/lipsync", { method: "POST", body });
+
+        if (!lipSyncResponse.ok) throw new Error("Lip sync is unavailable");
+
+        const videoUrl = URL.createObjectURL(await lipSyncResponse.blob());
+        currentLipSyncUrl.current = videoUrl;
+        audio.onended = finishSpeaking;
+        audio.onerror = finishSpeaking;
+        setPreparingLipSync(false);
+        setLipSyncVideo(videoUrl);
+      } catch {
+        await playVoiceOnly(audio);
+      }
     } catch {
-      setSpeaking(false);
+      finishSpeaking();
       setMessages((current) => [...current, { role: "maria", text: "My Google voice is temporarily unavailable. Please try again in a moment." }]);
     }
   }
@@ -100,19 +168,23 @@ export default function Home() {
           <div className="absolute left-6 top-6 z-10 max-w-xs lg:left-9 lg:top-9"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e2c27e]/25 bg-black/20 px-3 py-1.5 text-xs font-medium text-[#f5d994] backdrop-blur"><Sparkles size={14} /> Your local guide</div><h1 className="font-serif text-4xl leading-[1.02] sm:text-5xl lg:text-6xl">Meet Maria.</h1><p className="mt-3 max-w-[27rem] text-base leading-relaxed text-white/68">A warm, bilingual digital ambassador designed to welcome visitors and bring Siruma’s stories to life.</p></div>
           <div className="maria-cgi-frame" aria-label="Maria, the Siruma AI Tourism Ambassador">
             <video
+              ref={mariaVideo}
               className="maria-cgi-portrait maria-cgi-video"
-              src="/maria-veo-idle.mp4"
+              src={lipSyncVideo || "/maria-veo-idle.mp4"}
               poster="/maria-cgi-approved.png"
               autoPlay
               muted
-              loop
+              loop={!lipSyncVideo}
               playsInline
               preload="auto"
+              onEnded={() => {
+                if (lipSyncVideo && currentAudio.current?.ended) finishSpeaking();
+              }}
               aria-hidden="true"
             />
             <img className="maria-cgi-portrait maria-cgi-fallback" src="/maria-cgi-approved.png" alt="Maria, the Siruma AI Tourism Ambassador, wearing an embroidered cream Filipiniana" />
           </div>
-          <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between rounded-2xl border border-white/10 bg-[#061921]/75 p-3.5 backdrop-blur-xl lg:left-8 lg:right-8"><div className="flex items-center gap-3"><div className={`grid size-10 place-items-center rounded-full ${speaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div><div><p className="text-sm font-semibold">Maria</p><p className="text-xs text-white/55">{speaking ? "Speaking now…" : "AI Tourism Ambassador"}</p></div></div><div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${speaking ? "wave" : ""}`} style={{height}} />)}</div></div>
+          <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between rounded-2xl border border-white/10 bg-[#061921]/75 p-3.5 backdrop-blur-xl lg:left-8 lg:right-8"><div className="flex items-center gap-3"><div className={`grid size-10 place-items-center rounded-full ${speaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div><div><p className="text-sm font-semibold">Maria</p><p className="text-xs text-white/55">{preparingLipSync ? "Preparing natural lip sync…" : speaking ? "Speaking now…" : "AI Tourism Ambassador"}</p></div></div><div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${speaking ? "wave" : ""}`} style={{height}} />)}</div></div>
         </div>
 
         <div className="flex min-h-[520px] flex-col rounded-[2rem] bg-[#f6f1e8] p-4 text-[#102b34] shadow-2xl shadow-black/20 sm:p-6">
