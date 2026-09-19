@@ -1,7 +1,13 @@
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
+      - pull
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:job-candidate
+  - name: gcr.io/cloud-builders/docker
+    args:
       - build
+      - --cache-from
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:job-candidate
       - --file
       - services/latentsync/Dockerfile
       - --tag
