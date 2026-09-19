@@ -23,9 +23,7 @@ RUN python3 -m pip install --upgrade pip setuptools wheel \
         fastapi==0.115.12 \
         uvicorn==0.34.2 \
         python-multipart==0.0.20 \
-        google-cloud-storage==3.1.0 \
-        protobuf==3.20.3 \
-    && python3 -m pip check
+        google-cloud-storage==3.1.0
 
 RUN mkdir -p checkpoints/whisper /opt/hf-cache /opt/torch-cache \
     && huggingface-cli download ByteDance/LatentSync-1.6 latentsync_unet.pt --local-dir checkpoints \
@@ -33,6 +31,11 @@ RUN mkdir -p checkpoints/whisper /opt/hf-cache /opt/torch-cache \
     && python3 -c "from huggingface_hub import snapshot_download; snapshot_download('stabilityai/sd-vae-ft-mse', cache_dir='/opt/hf-cache', allow_patterns=['config.json','diffusion_pytorch_model.safetensors','diffusion_pytorch_model.bin'])" \
     && test -s checkpoints/latentsync_unet.pt \
     && test -s checkpoints/whisper/tiny.pt
+
+# google-cloud-storage can select protobuf 7, while MediaPipe requires protobuf <4.
+# Keep this correction after the model layer so rebuilds reuse downloaded weights.
+RUN python3 -m pip install --force-reinstall "protobuf==3.20.3" \
+    && python3 -m pip check
 
 COPY public/maria-veo-idle.mp4 /opt/maria/maria-veo-idle.mp4
 COPY services/latentsync/server.py /opt/latentsync/server.py
