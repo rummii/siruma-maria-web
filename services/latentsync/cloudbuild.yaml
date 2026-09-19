@@ -1,0 +1,15 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file
+      - services/latentsync/Dockerfile
+      - --tag
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:$SHORT_SHA
+      - .
+images:
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/maria-containers/maria-latentsync:$SHORT_SHA
+options:
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 200
+timeout: 3600s
