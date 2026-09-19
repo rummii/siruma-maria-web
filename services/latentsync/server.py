@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 APP_ROOT = Path("/opt/latentsync")
 DEFAULT_VIDEO = Path("/opt/maria/maria-veo-idle.mp4")
@@ -89,13 +90,15 @@ def lipsync(audio: UploadFile = File(...)) -> FileResponse:
         if not output_path.is_file() or output_path.stat().st_size == 0:
             raise HTTPException(status_code=500, detail="LatentSync did not produce a video")
 
-        persisted_output = Path(tempfile.mkstemp(prefix="maria-output-", suffix=".mp4")[1])
+        handle, persisted_name = tempfile.mkstemp(prefix="maria-output-", suffix=".mp4")
+        os.close(handle)
+        persisted_output = Path(persisted_name)
         shutil.copy2(output_path, persisted_output)
 
     return FileResponse(
         persisted_output,
         media_type="video/mp4",
         filename="maria-lipsync.mp4",
-        background=None,
+        background=BackgroundTask(persisted_output.unlink, missing_ok=True),
         headers={"X-Maria-Lipsync": "LatentSync-1.6"},
     )
