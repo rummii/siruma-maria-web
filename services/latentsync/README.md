@@ -36,6 +36,31 @@ gcloud run deploy maria-latentsync \
   --no-allow-unauthenticated
 ```
 
-Grant the `maria-runtime` service account Cloud Run Invoker on `maria-latentsync`. Set `LATENTSYNC_URL` on the `maria-web` service to the private service URL, then deploy a new website revision.
+Capture the private service URL:
+
+```bash
+LATENTSYNC_URL="$(gcloud run services describe maria-latentsync \
+  --region asia-southeast1 \
+  --format='value(status.url)')"
+```
+
+Allow only Maria's runtime identity to invoke the service:
+
+```bash
+gcloud run services add-iam-policy-binding maria-latentsync \
+  --region asia-southeast1 \
+  --member='serviceAccount:maria-runtime@siruma-maria-voice.iam.gserviceaccount.com' \
+  --role='roles/run.invoker'
+```
+
+Enable lip sync in the website without exposing the GPU service URL to browsers:
+
+```bash
+gcloud run services update maria-web \
+  --region asia-southeast1 \
+  --update-env-vars "LATENTSYNC_URL=${LATENTSYNC_URL}"
+```
+
+Deploy the website image containing this branch only after the GPU service passes its health and sample-generation tests.
 
 If `LATENTSYNC_URL` is absent or the service fails, the website keeps using Google TTS with the idle animation.
