@@ -30,9 +30,9 @@ declare global {
   }
 }
 
-const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
-
 export default function AdminPage() {
+  const [clientId, setClientId] = useState("");
+  const [googleReady, setGoogleReady] = useState(false);
   const [token, setToken] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [config, setConfig] = useState<Config | null>(null);
@@ -81,11 +81,19 @@ export default function AdminPage() {
   useEffect(() => {
     const saved = sessionStorage.getItem("maria-admin-token") || "";
     if (saved) setToken(saved);
+    fetch("/api/admin/auth-config")
+      .then((response) => response.json())
+      .then((data: { clientId?: string }) => setClientId(data.clientId || ""))
+      .catch(() => setStatus("Unable to load Google Sign-In configuration."));
   }, []);
 
   useEffect(() => {
     if (token) void loadDashboard();
   }, [token, loadDashboard]);
+
+  useEffect(() => {
+    if (googleReady && clientId && !token) initializeGoogle();
+  }, [googleReady, clientId, token]);
 
   function initializeGoogle() {
     const target = document.getElementById("google-admin-signin");
@@ -186,7 +194,7 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-[#061d28] px-5 py-8 text-[#102b34]">
-      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onLoad={initializeGoogle} />
+      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" onLoad={() => setGoogleReady(true)} />
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4 text-white">
           <div>
@@ -201,7 +209,7 @@ export default function AdminPage() {
             <h2 className="font-serif text-2xl">Administrator sign-in</h2>
             <p className="mt-2 max-w-xl text-[#536970]">Only Google accounts listed in the Cloud Run ADMIN_EMAILS setting can access this dashboard.</p>
             <div id="google-admin-signin" className="mt-6" />
-            {!clientId && <p className="mt-4 text-sm text-rose-700">NEXT_PUBLIC_GOOGLE_CLIENT_ID is not configured.</p>}
+            {!clientId && <p className="mt-4 text-sm text-rose-700">GOOGLE_CLIENT_ID is not configured on Cloud Run.</p>}
           </section>
         ) : config ? (
           <div className="grid gap-6 lg:grid-cols-2">
