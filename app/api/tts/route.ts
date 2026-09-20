@@ -3,18 +3,33 @@ import { voiceById } from "@/lib/voices";
 
 const MAX_TEXT_LENGTH = 1000;
 
+function toSpeechText(value: string) {
+  return value
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/^\s*[-+*]\s+/gm, "")
+    .replace(/^\s*\d+[.)]\s+/gm, "")
+    .replace(/[*_~`>|{}\[\]\\]/g, " ")
+    .replace(/&/g, " and ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function POST(request: Request) {
   let text = "";
   let requestedVoice = "";
   try {
     const body = (await request.json()) as { text?: unknown; voice?: unknown };
-    text = typeof body.text === "string" ? body.text.trim() : "";
+    text = typeof body.text === "string" ? toSpeechText(body.text).slice(0, MAX_TEXT_LENGTH) : "";
     requestedVoice = typeof body.voice === "string" ? body.voice : "";
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }
-  if (!text || text.length > MAX_TEXT_LENGTH) {
-    return Response.json({ error: "Text must be between 1 and 1000 characters" }, { status: 400 });
+  if (!text) {
+    return Response.json({ error: "Text must contain speakable content" }, { status: 400 });
   }
 
   let config;
