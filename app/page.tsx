@@ -221,7 +221,7 @@ export default function Home() {
   return (
     <main className="travel-shell min-h-screen text-[#182d2a]">
       <header ref={heroRef} className="travel-hero">
-        <img className="travel-hero-image" src="/siruma-rolling-hills.png" alt="" aria-hidden="true" />
+        <div className="travel-hero-image" aria-hidden="true" />
         <div className="relative z-10 mx-auto max-w-7xl px-5 pb-16 pt-6 sm:px-8 lg:px-10 lg:pb-24">
           <nav className="flex items-center justify-between text-white">
             <div className="flex items-center gap-3">
@@ -238,9 +238,9 @@ export default function Home() {
             </div>
           </nav>
 
-          <div className="mt-20 max-w-3xl text-white sm:mt-24 lg:mt-28">
+          <div className="mt-16 max-w-3xl text-white sm:mt-20 lg:mt-24">
             <p className="hero-eyebrow mb-5 text-xs font-semibold uppercase tracking-[.24em] text-[#f4d38a]">Camarines Sur · Philippines</p>
-            <h1 className="hero-title font-serif text-5xl leading-[.94] sm:text-6xl lg:text-7xl">Discover the quiet beauty of Siruma.</h1>
+            <h1 className="hero-title font-serif text-4xl leading-[.98] sm:text-5xl lg:text-6xl">Discover the quiet beauty of Siruma.</h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-white/82 sm:text-lg">
               Wild coastlines, rolling hills, and local adventures—made easier with Maria, your digital tourism guide.
             </p>
