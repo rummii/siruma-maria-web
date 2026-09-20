@@ -88,17 +88,6 @@ body {
   position: absolute;
   inset: 0;
 }
-.maria-mouth-canvas {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  background: transparent;
-}
 .maria-cgi-fallback { display: none; }
 
 .wave { animation: wave .72s ease-in-out infinite alternate; }
@@ -121,8 +110,7 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .maria-cgi-video,
-  .maria-mouth-canvas { display: none; }
+  .maria-cgi-video { display: none; }
   .maria-cgi-fallback { display: block; }
   .wave { animation: none; }
 }
