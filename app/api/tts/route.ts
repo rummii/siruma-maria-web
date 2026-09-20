@@ -1,10 +1,15 @@
+import { getMariaConfig } from "@/lib/maria-store";
+import { voiceById } from "@/lib/voices";
+
 const MAX_TEXT_LENGTH = 1000;
 
 export async function POST(request: Request) {
   let text = "";
+  let requestedVoice = "";
   try {
-    const body = (await request.json()) as { text?: unknown };
+    const body = (await request.json()) as { text?: unknown; voice?: unknown };
     text = typeof body.text === "string" ? body.text.trim() : "";
+    requestedVoice = typeof body.voice === "string" ? body.voice : "";
   } catch {
     return Response.json({ error: "Invalid request" }, { status: 400 });
   }
@@ -12,7 +17,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "Text must be between 1 and 1000 characters" }, { status: 400 });
   }
 
-  const voiceName = "fil-PH-Wavenet-A";
+  let config;
+  try {
+    config = await getMariaConfig();
+  } catch {
+    config = null;
+  }
+  const voice = voiceById(requestedVoice || config?.defaultVoice);
+
   let authorization = "";
   if (process.env.GOOGLE_TTS_API_KEY) {
     authorization = `X-Goog-Api-Key ${process.env.GOOGLE_TTS_API_KEY}`;
@@ -40,8 +52,8 @@ export async function POST(request: Request) {
     headers,
     body: JSON.stringify({
       input: { text },
-      voice: { languageCode: "fil-PH", name: voiceName, ssmlGender: "FEMALE" },
-      audioConfig: { audioEncoding: "MP3", speakingRate: 0.96, pitch: 0.5 },
+      voice: { languageCode: voice.languageCode, name: voice.name, ssmlGender: voice.gender },
+      audioConfig: { audioEncoding: "MP3", speakingRate: 0.98, pitch: 0 },
     }),
   });
 
@@ -54,7 +66,7 @@ export async function POST(request: Request) {
     headers: {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "private, max-age=300",
-      "X-Maria-Voice": voiceName,
+      "X-Maria-Voice": voice.label,
     },
   });
 }
