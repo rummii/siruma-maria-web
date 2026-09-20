@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       method: "POST",
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: `${config.systemPrompt}\n\nFallback message: ${config.fallbackMessage}` }],
+          parts: [{ text: `${config.systemPrompt}\n\nFallback message: ${config.fallbackMessage}\n\nRespond using natural spoken prose only. Do not use Markdown, headings, bullets, asterisks, hash symbols, raw URLs, or other formatting characters.` }],
         },
         contents: [{
           role: "user",
