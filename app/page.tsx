@@ -75,10 +75,10 @@ export default function Home() {
     const context = new AudioContext();
     const source = context.createMediaElementSource(audio);
     const analyser = context.createAnalyser();
-    const waveform = new Uint8Array(analyser.fftSize);
 
     analyser.fftSize = 512;
     analyser.smoothingTimeConstant = 0.62;
+    const waveform = new Uint8Array(analyser.fftSize);
     source.connect(analyser);
     analyser.connect(context.destination);
 
