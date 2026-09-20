@@ -60,16 +60,28 @@ body {
     linear-gradient(180deg, #edf1e8 0%, #f6f3eb 55%, #f1eee5 100%);
 }
 .travel-hero {
+  --parallax-y: 0px;
   position: relative;
-  min-height: 34rem;
+  min-height: clamp(31rem, 72vh, 46rem);
   overflow: hidden;
   isolation: isolate;
+  background: #183f3d;
+}
+.travel-hero::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: -10% 0;
   background-image: url("/siruma-rolling-hills.png");
   background-position: center 46%;
   background-size: cover;
+  transform: translate3d(0, var(--parallax-y), 0) scale(1.04);
+  transform-origin: center;
+  will-change: transform;
 }
 .travel-hero-overlay {
   position: absolute;
+  z-index: -1;
   inset: 0;
   background:
     linear-gradient(90deg, rgba(4, 27, 34, .88) 0%, rgba(4, 34, 39, .66) 42%, rgba(4, 31, 35, .2) 72%, rgba(4, 25, 30, .32) 100%),
@@ -91,7 +103,14 @@ body {
   color: rgba(255,255,255,.9);
   backdrop-filter: blur(10px);
 }
-.travel-content { margin-top: -3.25rem; }
+.travel-content {
+  margin-top: -3.25rem;
+  width: 100%;
+}
+.travel-content > * { min-width: 0; }
+.travel-chat-card,
+.maria-guide-card { contain: paint; }
+.travel-chat-card { min-width: 0; }
 .maria-guide-card::before {
   content: "";
   position: absolute;
@@ -136,19 +155,67 @@ body {
   to { transform: scaleY(1.2); opacity: 1; }
 }
 
+@media (min-width: 1536px) {
+  .travel-hero::before { background-position: center 43%; }
+  .travel-content { max-width: 90rem; }
+}
+@media (max-width: 1180px) and (min-width: 1024px) {
+  .travel-content { grid-template-columns: .9fr 1.1fr; }
+  .maria-guide-card { min-height: 35rem; }
+  .travel-chat-card { min-height: 35rem; }
+}
 @media (max-width: 1023px) {
-  .travel-hero { min-height: 31rem; }
-  .travel-content { margin-top: -2rem; }
+  .travel-hero { min-height: clamp(30rem, 68vh, 38rem); }
+  .travel-content {
+    margin-top: -2rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .maria-guide-card { min-height: 40rem; }
+  .travel-chat-card { min-height: 38rem; }
 }
 @media (max-width: 640px) {
   .travel-hero {
     min-height: 35rem;
-    background-position: 58% center;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
-  .travel-content { margin-top: -1.5rem; }
+  .travel-hero::before { background-position: 58% center; }
+  .travel-hero h1 {
+    max-width: 11ch;
+    font-size: clamp(2.7rem, 14vw, 4.25rem);
+  }
+  .travel-content {
+    margin-top: -1.5rem;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
   .maria-guide-card { min-height: 34rem; }
+  .travel-chat-card {
+    min-height: 36rem;
+    border-radius: 1.5rem;
+  }
+}
+@media (max-width: 420px) {
+  .travel-hero { min-height: 36rem; }
+  .travel-hero h1 { font-size: clamp(2.45rem, 13vw, 3.4rem); }
+  .travel-pill { padding: .55rem .78rem; font-size: .78rem; }
+  .maria-guide-card {
+    min-height: 31rem;
+    border-radius: 1.5rem;
+  }
+  .maria-guide-gradient { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .travel-chat-card { padding: 1rem; }
+}
+@media (max-height: 720px) and (min-width: 1024px) {
+  .travel-hero { min-height: 30rem; }
+  .maria-guide-card,
+  .travel-chat-card { min-height: 33rem; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .travel-hero::before {
+    transform: none;
+    will-change: auto;
+  }
   .maria-cgi-video { display: none; }
   .maria-cgi-fallback { display: block; }
   .wave { animation: none; }
