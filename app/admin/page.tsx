@@ -10,6 +10,7 @@ type Config = {
   defaultVoice: string;
   defaultLanguage: string;
   avatarType: "video" | "image";
+  responseMode: "text-and-voice" | "voice-only" | "text-only";
   suggestions: string[];
 };
 
@@ -258,6 +259,18 @@ export default function AdminPage() {
                   </select>
                 </Label>
               </div>
+              <Label title="Response output">
+                <select
+                  value={config.responseMode}
+                  onChange={(event) => setConfig({ ...config, responseMode: event.target.value as Config["responseMode"] })}
+                  className="admin-input"
+                >
+                  <option value="text-and-voice">Text and voice</option>
+                  <option value="voice-only">Voice only — hide Maria’s answer text</option>
+                  <option value="text-only">Text only — do not play speech</option>
+                </select>
+                <span className="mt-1 block text-xs text-[#64777d]">Controls how Maria delivers new answers to visitors.</span>
+              </Label>
               <button disabled={busy} className="rounded-xl bg-[#c99c48] px-5 py-3 font-semibold disabled:opacity-50">Save settings</button>
             </form>
 
