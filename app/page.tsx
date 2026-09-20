@@ -40,8 +40,11 @@ export default function Home() {
   useEffect(() => {
     let active = true;
     fetch("/api/config", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : Promise.reject())
-      .then((data: PublicConfig) => {
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Configuration unavailable");
+        return await response.json() as PublicConfig;
+      })
+      .then((data) => {
         if (!active) return;
         setConfig(data);
         setMessages((current) =>
