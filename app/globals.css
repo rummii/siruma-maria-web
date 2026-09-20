@@ -1,6 +1,147 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
-:root{--background:#061d28;--foreground:#f8faf9;--primary:#0b3947;--primary-foreground:#fff;--secondary:#f6f1e8;--secondary-foreground:#102b34;--muted:#e8e1d7;--muted-foreground:#64777d;--accent:#d8b56b;--accent-foreground:#102b34;--destructive:#c73548;--border:#d7d2c9;--input:#d7d2c9;--ring:#c99c48;--radius:.75rem}
-@theme inline{--color-background:var(--background);--color-foreground:var(--foreground);--color-primary:var(--primary);--color-primary-foreground:var(--primary-foreground);--color-secondary:var(--secondary);--color-secondary-foreground:var(--secondary-foreground);--color-muted:var(--muted);--color-muted-foreground:var(--muted-foreground);--color-accent:var(--accent);--color-accent-foreground:var(--accent-foreground);--color-destructive:var(--destructive);--color-border:var(--border);--color-input:var(--input);--color-ring:var(--ring);--radius-sm:calc(var(--radius) - 4px);--radius-md:calc(var(--radius) - 2px);--radius-lg:var(--radius);--radius-xl:calc(var(--radius) + 4px);--font-sans:"Avenir Next",Avenir,"Segoe UI",sans-serif}
-*{box-sizing:border-box}html{background:#061d28}body{margin:0;background:var(--background);color:var(--foreground);font-family:"Avenir Next",Avenir,"Segoe UI",sans-serif}.font-serif{font-family:Georgia,"Times New Roman",serif;letter-spacing:-.025em}.ambient{position:fixed;inset:-30%;pointer-events:none;background:radial-gradient(circle at 15% 10%,rgba(27,115,131,.28),transparent 29%),radial-gradient(circle at 83% 70%,rgba(196,148,62,.15),transparent 28%);filter:blur(32px)}.maria-cgi-frame{position:absolute;left:50%;bottom:4.6rem;width:min(54%,24rem);aspect-ratio:2/3;overflow:hidden;transform:translateX(-50%);border-radius:1.6rem;box-shadow:0 28px 54px rgba(0,0,0,.3);background:#77716e}.maria-cgi-portrait{display:block;width:100%;height:100%;object-fit:contain;object-position:center;background:#77716e}.maria-cgi-video{position:absolute;inset:0}.maria-cgi-fallback{display:none}.wave{animation:wave .72s ease-in-out infinite alternate}.wave:nth-child(2),.wave:nth-child(4){animation-delay:.2s}.wave:nth-child(3){animation-delay:.38s}@keyframes wave{from{transform:scaleY(.45);opacity:.55}to{transform:scaleY(1.2);opacity:1}}@media(max-width:1023px){.maria-cgi-frame{width:min(56%,23rem)}}@media(max-width:640px){.maria-cgi-frame{bottom:4.8rem;width:min(68%,20rem)}}@media(prefers-reduced-motion:reduce){.maria-cgi-video{display:none}.maria-cgi-fallback{display:block}.wave{animation:none}}
+
+:root {
+  --background: #061d28;
+  --foreground: #f8faf9;
+  --primary: #0b3947;
+  --primary-foreground: #fff;
+  --secondary: #f6f1e8;
+  --secondary-foreground: #102b34;
+  --muted: #e8e1d7;
+  --muted-foreground: #64777d;
+  --accent: #d8b56b;
+  --accent-foreground: #102b34;
+  --destructive: #c73548;
+  --border: #d7d2c9;
+  --input: #d7d2c9;
+  --ring: #c99c48;
+  --radius: .75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { background: #061d28; }
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+}
+.font-serif {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -.025em;
+}
+.ambient {
+  position: fixed;
+  inset: -30%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(27,115,131,.28), transparent 29%),
+    radial-gradient(circle at 83% 70%, rgba(196,148,62,.15), transparent 28%);
+  filter: blur(32px);
+}
+
+.maria-cgi-frame {
+  --speech-level: 0;
+  position: absolute;
+  left: 50%;
+  bottom: 4.6rem;
+  width: min(54%, 24rem);
+  aspect-ratio: 2/3;
+  overflow: hidden;
+  transform: translateX(-50%);
+  border-radius: 1.6rem;
+  box-shadow: 0 28px 54px rgba(0,0,0,.3);
+  background: #77716e;
+}
+.maria-cgi-portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: #77716e;
+}
+.maria-cgi-video {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 72%;
+  animation: maria-breathe 10s ease-in-out infinite;
+  transition: filter .8s ease;
+}
+.maria-mouth-layer,
+.maria-blink-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: transparent;
+}
+.maria-mouth-layer {
+  opacity: var(--speech-level);
+  clip-path: ellipse(11.5% 4.8% at 50% 21.8%);
+  transition: opacity 42ms linear;
+}
+.maria-blink-layer {
+  opacity: 0;
+  clip-path: ellipse(18% 4.8% at 50% 15.4%);
+  transition: opacity 48ms ease;
+}
+.maria-is-blinking .maria-blink-layer { opacity: .94; }
+.maria-is-speaking .maria-cgi-video {
+  filter: saturate(.99) brightness(.995);
+}
+.maria-cgi-fallback { display: none; }
+
+.wave { animation: wave .72s ease-in-out infinite alternate; }
+.wave:nth-child(2),
+.wave:nth-child(4) { animation-delay: .2s; }
+.wave:nth-child(3) { animation-delay: .38s; }
+
+@keyframes maria-breathe {
+  0%, 100% { transform: scale(1.002) translateY(0); }
+  50% { transform: scale(1.006) translateY(-.12%); }
+}
+@keyframes wave {
+  from { transform: scaleY(.45); opacity: .55; }
+  to { transform: scaleY(1.2); opacity: 1; }
+}
+
+@media (max-width: 1023px) {
+  .maria-cgi-frame { width: min(56%, 23rem); }
+}
+@media (max-width: 640px) {
+  .maria-cgi-frame {
+    bottom: 4.8rem;
+    width: min(68%, 20rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .maria-cgi-video,
+  .maria-mouth-layer,
+  .maria-blink-layer { display: none; }
+  .maria-cgi-fallback { display: block; }
+  .wave { animation: none; }
+}
