@@ -38,47 +38,26 @@ export default function Home() {
   const chatBox = useRef<HTMLDivElement>(null);
   const idleVideo = useRef<HTMLVideoElement>(null);
   const currentAudio = useRef<HTMLAudioElement | null>(null);
+  const configRef = useRef(DEFAULT_CONFIG);
 
   useEffect(() => {
     let active = true;
-
-    async function refreshConfig() {
-      try {
-        const response = await fetch(`/api/config?updated=${Date.now()}`, { cache: "no-store" });
+    fetch("/api/config", { cache: "no-store" })
+      .then(async (response) => {
         if (!response.ok) throw new Error("Configuration unavailable");
-        const data = await response.json() as PublicConfig;
+        return await response.json() as PublicConfig;
+      })
+      .then((data) => {
         if (!active) return;
-
-        setConfig((currentConfig) => {
-          setMessages((currentMessages) =>
-            currentMessages.length === 1 &&
-            currentMessages[0].role === "maria" &&
-            currentMessages[0].text === currentConfig.welcomeMessage
-              ? [{ role: "maria", text: data.welcomeMessage }]
-              : currentMessages,
-          );
-          return data;
-        });
-      } catch {
-        // Keep the last working configuration during a temporary refresh failure.
-      }
-    }
-
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void refreshConfig();
-    };
-
-    void refreshConfig();
-    const interval = window.setInterval(() => void refreshConfig(), 5000);
-    window.addEventListener("focus", refreshWhenVisible);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refreshWhenVisible);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-    };
+        setConfig(data);
+        setMessages((current) =>
+          current.length === 1 && current[0].text === DEFAULT_CONFIG.welcomeMessage
+            ? [{ role: "maria", text: data.welcomeMessage }]
+            : current,
+        );
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
