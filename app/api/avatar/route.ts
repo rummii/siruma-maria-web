@@ -1,6 +1,9 @@
 import { googleAccessToken, projectId } from "@/lib/google-cloud";
 import { getMariaConfig } from "@/lib/maria-store";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     const config = await getMariaConfig();
@@ -25,7 +28,9 @@ export async function GET(request: Request) {
       const value = response.headers.get(name);
       if (value) headers.set(name, value);
     }
-    headers.set("Cache-Control", "public, max-age=300");
+    headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+    headers.set("CDN-Cache-Control", "no-store");
+    headers.set("Pragma", "no-cache");
     return new Response(response.body, { status: response.status, headers });
   } catch {
     return Response.json({ error: "Avatar is temporarily unavailable" }, { status: 503 });
