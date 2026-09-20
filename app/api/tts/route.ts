@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     headers: {
       "Content-Type": "audio/mpeg",
       "Cache-Control": "private, max-age=300",
-      "X-Maria-Voice": voice.label,
+      "X-Maria-Voice": voice.name,
     },
   });
 }
