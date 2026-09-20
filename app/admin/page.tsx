@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [status, setStatus] = useState("Sign in with an approved Google account.");
   const [busy, setBusy] = useState(false);
 
-  const api = useCallback(async (url: string, init: RequestInit = {}) => {
+  const api = useCallback(async (url: string, init: RequestInit = {}): Promise<any> => {
     const response = await fetch(url, {
       ...init,
       headers: {
@@ -51,8 +51,8 @@ export default function AdminPage() {
         ...(init.headers || {}),
       },
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Request failed");
+    const data = await response.json() as Record<string, any>;
+    if (!response.ok) throw new Error(String(data.error || "Request failed"));
     return data;
   }, [token]);
 
@@ -82,8 +82,8 @@ export default function AdminPage() {
     const saved = sessionStorage.getItem("maria-admin-token") || "";
     if (saved) setToken(saved);
     fetch("/api/admin/auth-config")
-      .then((response) => response.json())
-      .then((data: { clientId?: string }) => setClientId(data.clientId || ""))
+      .then(async (response) => await response.json() as { clientId?: string })
+      .then((data) => setClientId(data.clientId || ""))
       .catch(() => setStatus("Unable to load Google Sign-In configuration."));
   }, []);
 
