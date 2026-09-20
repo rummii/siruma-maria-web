@@ -36,6 +36,7 @@ export default function Home() {
   const [thinking, setThinking] = useState(false);
   const [voiceName, setVoiceName] = useState("Google Filipino female");
   const chatBox = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
   const idleVideo = useRef<HTMLVideoElement>(null);
   const currentAudio = useRef<HTMLAudioElement | null>(null);
   const configRef = useRef(DEFAULT_CONFIG);
@@ -79,6 +80,28 @@ export default function Home() {
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let frame = 0;
+    const updateParallax = () => {
+      frame = 0;
+      const offset = Math.min(window.scrollY * 0.18, 96);
+      hero.style.setProperty("--parallax-y", `${offset}px`);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateParallax);
+    };
+
+    updateParallax();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
 
@@ -197,7 +220,7 @@ export default function Home() {
 
   return (
     <main className="travel-shell min-h-screen text-[#102b34]">
-      <header className="travel-hero">
+      <header ref={heroRef} className="travel-hero">
         <div className="travel-hero-overlay" aria-hidden="true" />
         <div className="relative z-10 mx-auto max-w-7xl px-5 pb-14 pt-5 lg:px-10 lg:pb-20">
           <nav className="flex items-center justify-between text-white">
