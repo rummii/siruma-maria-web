@@ -196,35 +196,90 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#061d28] text-white">
-      <div className="ambient" aria-hidden="true" />
-      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 lg:px-10">
-        <div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-full border border-[#d8b56b]/50 bg-[#d8b56b]/10 text-[#f2cf82]"><Compass size={21} /></div><div><p className="font-serif text-lg leading-none">Siruma</p><p className="mt-1 text-xs uppercase tracking-[0.24em] text-white/55">Digital Tourism Center</p></div></div>
-        <div className="hidden items-center gap-2 text-sm text-white/65 sm:flex"><span className="size-2 rounded-full bg-emerald-400" /> Maria is ready</div>
+    <main className="travel-shell min-h-screen text-[#102b34]">
+      <header className="travel-hero">
+        <div className="travel-hero-overlay" aria-hidden="true" />
+        <div className="relative z-10 mx-auto max-w-7xl px-5 pb-14 pt-5 lg:px-10 lg:pb-20">
+          <nav className="flex items-center justify-between text-white">
+            <div className="flex items-center gap-3">
+              <div className="grid size-11 place-items-center rounded-full border border-white/35 bg-white/15 text-[#ffe7a8] backdrop-blur-md">
+                <Compass size={22} />
+              </div>
+              <div>
+                <p className="font-serif text-xl leading-none">Siruma</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.26em] text-white/75">Digital Tourism Center</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-white/20 bg-black/15 px-3 py-2 text-sm text-white/85 backdrop-blur-md">
+              <span className="size-2 rounded-full bg-emerald-300" /> Maria is ready
+            </div>
+          </nav>
+
+          <div className="mt-16 max-w-3xl text-white lg:mt-24">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/25 bg-black/15 px-4 py-2 text-sm font-medium backdrop-blur-md">
+              <Sparkles size={16} className="text-[#ffe09a]" /> Explore Camarines Sur differently
+            </div>
+            <h1 className="font-serif text-5xl leading-[.96] sm:text-6xl lg:text-7xl">Discover the quiet beauty of Siruma.</h1>
+            <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/85 sm:text-lg">
+              Rolling green hills, island shores, and local adventures—planned with help from Maria, your digital tourism ambassador.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3 text-sm">
+              <span className="travel-pill">Island escapes</span>
+              <span className="travel-pill">Nature adventures</span>
+              <span className="travel-pill">Local travel guidance</span>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <section className="relative z-10 mx-auto grid min-h-[calc(100vh-80px)] max-w-7xl items-stretch gap-6 px-5 pb-5 lg:grid-cols-[1.05fr_.95fr] lg:px-10 lg:pb-10">
-        <div className="relative min-h-[520px] overflow-hidden rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_50%_25%,#174c5c_0%,#0a2c38_45%,#061c26_100%)]">
-          <div className="absolute left-6 top-6 z-10 max-w-xs lg:left-9 lg:top-9"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#e2c27e]/25 bg-black/20 px-3 py-1.5 text-xs font-medium text-[#f5d994] backdrop-blur"><Sparkles size={14} /> Your local guide</div><h1 className="font-serif text-4xl leading-[1.02] sm:text-5xl lg:text-6xl">Meet Maria.</h1><p className="mt-3 max-w-[27rem] text-base leading-relaxed text-white/68">A warm, multilingual digital ambassador designed to welcome visitors and bring Siruma’s stories to life.</p></div>
-          <div className="maria-cgi-frame" aria-label="Maria, the Siruma AI Tourism Ambassador">
-            {config.avatarType === "video" ? (
-              <video key={config.avatarUrl} ref={idleVideo} className="maria-cgi-portrait maria-cgi-video" src={config.avatarUrl} poster="/maria-cgi-approved.png" autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
-            ) : (
-              <img className="maria-cgi-portrait" src={config.avatarUrl} alt="Maria, the Siruma AI Tourism Ambassador" />
-            )}
-            <img className="maria-cgi-portrait maria-cgi-fallback" src="/maria-cgi-approved.png" alt="Maria, the Siruma AI Tourism Ambassador, wearing an embroidered cream Filipiniana" />
+      <section className="travel-content relative z-20 mx-auto grid max-w-7xl items-start gap-7 px-5 py-8 lg:grid-cols-[.82fr_1.18fr] lg:px-10 lg:py-12">
+        <aside className="lg:sticky lg:top-6">
+          <div className="maria-guide-card relative min-h-[570px] overflow-hidden rounded-[2rem] border border-white/70 bg-[#0a3340] shadow-[0_28px_80px_rgba(6,29,40,.22)]">
+            <div className="absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border border-white/20 bg-[#082b36]/70 px-3 py-2 text-xs font-semibold text-[#ffe29b] backdrop-blur-md">
+              <Sparkles size={14} /> Your local guide
+            </div>
+            <div className="maria-cgi-frame" aria-label="Maria, the Siruma AI Tourism Ambassador">
+              {config.avatarType === "video" ? (
+                <video key={config.avatarUrl} ref={idleVideo} className="maria-cgi-portrait maria-cgi-video" src={config.avatarUrl} poster="/maria-cgi-approved.png" autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
+              ) : (
+                <img className="maria-cgi-portrait" src={config.avatarUrl} alt="Maria, the Siruma AI Tourism Ambassador" />
+              )}
+              <img className="maria-cgi-portrait maria-cgi-fallback" src="/maria-cgi-approved.png" alt="Maria, the Siruma AI Tourism Ambassador, wearing an embroidered cream Filipiniana" />
+            </div>
+            <div className="maria-guide-gradient absolute inset-x-0 bottom-0 z-10 px-6 pb-6 pt-28 text-white">
+              <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#f1ce81]">Meet your host</p>
+              <h2 className="mt-1 font-serif text-4xl">Maria</h2>
+              <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/72">A warm, multilingual guide ready to help you discover Siruma’s places, stories, and experiences.</p>
+              <div className="mt-5 flex items-center justify-between rounded-2xl border border-white/12 bg-[#061921]/65 p-3.5 backdrop-blur-xl">
+                <div className="flex items-center gap-3">
+                  <div className={`grid size-10 place-items-center rounded-full ${speaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div>
+                  <div><p className="text-sm font-semibold">AI Tourism Ambassador</p><p className="text-xs text-white/55">{speaking ? "Speaking now…" : thinking ? "Preparing an answer…" : "Online and ready"}</p></div>
+                </div>
+                <div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${speaking ? "wave" : ""}`} style={{height}} />)}</div>
+              </div>
+            </div>
           </div>
-          <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between rounded-2xl border border-white/10 bg-[#061921]/75 p-3.5 backdrop-blur-xl lg:left-8 lg:right-8"><div className="flex items-center gap-3"><div className={`grid size-10 place-items-center rounded-full ${speaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div><div><p className="text-sm font-semibold">Maria</p><p className="text-xs text-white/55">{speaking ? "Speaking now…" : thinking ? "Preparing an answer…" : "AI Tourism Ambassador"}</p></div></div><div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${speaking ? "wave" : ""}`} style={{height}} />)}</div></div>
-        </div>
+        </aside>
 
-        <div className="flex min-h-[520px] flex-col rounded-[2rem] bg-[#f6f1e8] p-4 text-[#102b34] shadow-2xl shadow-black/20 sm:p-6">
-          <div className="flex items-center justify-between border-b border-[#153743]/10 pb-4"><div><p className="font-serif text-2xl">Ask Maria</p><p className="text-sm text-[#49636b]">Speak naturally or type a question</p></div><Button onClick={listen} size="icon-lg" aria-label={listening ? "Listening" : "Start voice input"} className={`rounded-full ${listening ? "bg-rose-600 hover:bg-rose-600" : "bg-[#0b3947] hover:bg-[#125064]"}`}>{listening ? <MicOff /> : <Mic />}</Button></div>
-          <div ref={chatBox} className="scrollbar-thin my-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">{messages.map((message, index) => <div key={index} className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed ${message.role === "visitor" ? "rounded-br-md bg-[#0b3947] text-white" : "rounded-bl-md border border-[#153743]/10 bg-white text-[#263f47] shadow-sm"}`}>{message.text}</div></div>)}{thinking && <div className="text-sm text-[#64777d]">Maria is thinking…</div>}</div>
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{config.suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)} disabled={thinking} className="shrink-0 rounded-full border border-[#0b3947]/15 bg-white px-3 py-2 text-sm font-medium text-[#24434d] transition hover:border-[#c49c4f] hover:bg-[#fffaf0] disabled:opacity-50">{suggestion}</button>)}</div>
-          <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-[#0b3947]/15 bg-white p-2 shadow-sm focus-within:border-[#c49c4f] focus-within:ring-4 focus-within:ring-[#c49c4f]/10"><MapPin className="ml-2 shrink-0 text-[#b68732]" size={19} /><input value={input} onChange={(event) => setInput(event.target.value)} className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-[#71868c]" placeholder="Ask about Siruma…" aria-label="Question for Maria" /><Button type="submit" size="icon-lg" disabled={thinking} className="rounded-xl bg-[#c99c48] text-[#102b34] hover:bg-[#deb968]" aria-label="Send question"><Send /></Button></form>
-          <p className="mt-3 text-center text-xs text-[#6e8186]">Knowledge-grounded assistant • Voice: {voiceName}</p>
+        <div className="travel-chat-card flex min-h-[650px] flex-col rounded-[2rem] border border-[#123d48]/10 bg-[#fffdf8] p-4 text-[#102b34] shadow-[0_24px_70px_rgba(6,29,40,.14)] sm:p-7">
+          <div className="flex items-center justify-between border-b border-[#153743]/10 pb-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[.2em] text-[#a57424]">Plan your visit</p>
+              <p className="mt-1 font-serif text-3xl">Ask Maria</p>
+              <p className="mt-1 text-sm text-[#49636b]">Speak naturally or type a question</p>
+            </div>
+            <Button onClick={listen} size="icon-lg" aria-label={listening ? "Listening" : "Start voice input"} className={`rounded-full shadow-lg ${listening ? "bg-rose-600 hover:bg-rose-600" : "bg-[#0b5960] hover:bg-[#126f76]"}`}>{listening ? <MicOff /> : <Mic />}</Button>
+          </div>
+          <div ref={chatBox} className="scrollbar-thin my-5 min-h-[310px] flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">{messages.map((message, index) => <div key={index} className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed ${message.role === "visitor" ? "rounded-br-md bg-[#0b5960] text-white" : "rounded-bl-md border border-[#153743]/10 bg-white text-[#263f47] shadow-sm"}`}>{message.text}</div></div>)}{thinking && <div className="text-sm text-[#64777d]">Maria is thinking…</div>}</div>
+          {!!config.suggestions.length && <div className="mb-4"><p className="mb-2 text-xs font-semibold uppercase tracking-[.16em] text-[#77898d]">Popular questions</p><div className="flex gap-2 overflow-x-auto pb-1">{config.suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)} disabled={thinking} className="shrink-0 rounded-full border border-[#0b5960]/15 bg-[#f7f4ea] px-4 py-2.5 text-sm font-semibold text-[#24434d] transition hover:border-[#c49c4f] hover:bg-[#fff7df] disabled:opacity-50">{suggestion}</button>)}</div></div>}
+          <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-[#0b5960]/15 bg-white p-2.5 shadow-sm focus-within:border-[#c49c4f] focus-within:ring-4 focus-within:ring-[#c49c4f]/10"><MapPin className="ml-2 shrink-0 text-[#b68732]" size={19} /><input value={input} onChange={(event) => setInput(event.target.value)} className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-[#71868c]" placeholder="Ask about Siruma…" aria-label="Question for Maria" /><Button type="submit" size="icon-lg" disabled={thinking} className="rounded-xl bg-[#d2a443] text-[#102b34] hover:bg-[#e2bb68]" aria-label="Send question"><Send /></Button></form>
+          <p className="mt-4 text-center text-xs text-[#6e8186]">Knowledge-grounded local guidance • Voice: {voiceName}</p>
         </div>
       </section>
+
+      <footer className="border-t border-[#123d48]/10 bg-[#e9efe7] px-5 py-6 text-center text-sm text-[#536a68]">
+        Siruma Digital Tourism Center · Camarines Sur, Philippines
+      </footer>
     </main>
   );
 }
