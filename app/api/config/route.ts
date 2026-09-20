@@ -1,4 +1,4 @@
-import { getMariaConfig } from "@/lib/maria-store";
+import { getMariaConfig, listKnowledge } from "@/lib/maria-store";
 import { MARIA_VOICES } from "@/lib/voices";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,16 @@ const NO_CACHE_HEADERS = {
 
 export async function GET() {
   try {
-    const config = await getMariaConfig();
+    const [config, entries] = await Promise.all([getMariaConfig(), listKnowledge()]);
+    const suggestions = entries
+      .filter((entry) => entry.enabled)
+      .map((entry) => entry.title.trim())
+      .filter(Boolean)
+      .slice(0, 8);
     return Response.json(
       {
         ...config,
+        suggestions,
         avatarUrl: config.avatarObject
           ? `/api/avatar?updated=${encodeURIComponent(config.updatedAt || "")}`
           : "/maria-veo-idle.mp4",
