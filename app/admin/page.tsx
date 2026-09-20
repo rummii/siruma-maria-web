@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type Config = {
   welcomeMessage: string;
@@ -39,7 +39,9 @@ export default function AdminPage() {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [knowledge, setKnowledge] = useState({ id: "", title: "", content: "", enabled: true });
+  const [deleteId, setDeleteId] = useState("");
   const [status, setStatus] = useState("Sign in with an approved Google account.");
+  const knowledgeForm = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
 
   const api = useCallback(async (url: string, init: RequestInit = {}): Promise<any> => {
@@ -153,12 +155,22 @@ export default function AdminPage() {
     }
   }
 
+  function editKnowledge(entry: Entry) {
+    setKnowledge(entry);
+    setStatus(`Editing “${entry.title}”.`);
+    window.requestAnimationFrame(() => {
+      knowledgeForm.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      knowledgeForm.current?.querySelector<HTMLInputElement>("input")?.focus();
+    });
+  }
+
   async function removeKnowledge(id: string) {
-    if (!confirm("Delete this knowledge entry?")) return;
     setBusy(true);
     try {
       await api(`/api/admin/knowledge?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       setEntries((current) => current.filter((entry) => entry.id !== id));
+      if (knowledge.id === id) setKnowledge({ id: "", title: "", content: "", enabled: true });
+      setDeleteId("");
       setStatus("Knowledge entry deleted.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Delete failed");
@@ -257,7 +269,7 @@ export default function AdminPage() {
                 <button disabled={busy} className="mt-5 rounded-xl bg-[#0b3947] px-5 py-3 font-semibold text-white disabled:opacity-50">Upload avatar</button>
               </form>
 
-              <form onSubmit={saveKnowledge} className="space-y-4 rounded-3xl bg-[#f6f1e8] p-6 shadow-xl">
+              <form ref={knowledgeForm} onSubmit={saveKnowledge} className="scroll-mt-6 space-y-4 rounded-3xl bg-[#f6f1e8] p-6 shadow-xl">
                 <h2 className="font-serif text-2xl">{knowledge.id ? "Edit knowledge" : "Add knowledge"}</h2>
                 <Label title="Title">
                   <input value={knowledge.title} onChange={(event) => setKnowledge({ ...knowledge, title: event.target.value })} className="admin-input" required />
@@ -266,7 +278,10 @@ export default function AdminPage() {
                   <textarea value={knowledge.content} onChange={(event) => setKnowledge({ ...knowledge, content: event.target.value })} rows={7} className="admin-input" required />
                 </Label>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={knowledge.enabled} onChange={(event) => setKnowledge({ ...knowledge, enabled: event.target.checked })} /> Enabled</label>
-                <button disabled={busy} className="rounded-xl bg-[#0b3947] px-5 py-3 font-semibold text-white disabled:opacity-50">Save knowledge</button>
+                <div className="flex gap-3">
+                  <button disabled={busy} className="rounded-xl bg-[#0b3947] px-5 py-3 font-semibold text-white disabled:opacity-50">{knowledge.id ? "Update knowledge" : "Save knowledge"}</button>
+                  {knowledge.id && <button type="button" onClick={() => setKnowledge({ id: "", title: "", content: "", enabled: true })} className="rounded-xl border border-[#0b3947]/20 px-5 py-3 font-semibold">Cancel edit</button>}
+                </div>
               </form>
             </div>
 
@@ -278,8 +293,15 @@ export default function AdminPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div><h3 className="font-semibold">{entry.title}</h3><p className="mt-1 text-xs text-[#64777d]">{entry.enabled ? "Enabled" : "Disabled"}</p></div>
                       <div className="flex gap-2">
-                        <button type="button" onClick={() => setKnowledge(entry)} className="text-sm font-semibold text-[#0b5268]">Edit</button>
-                        <button type="button" onClick={() => removeKnowledge(entry.id)} className="text-sm font-semibold text-rose-700">Delete</button>
+                        <button type="button" onClick={() => editKnowledge(entry)} className="rounded-lg px-2 py-1 text-sm font-semibold text-[#0b5268] hover:bg-[#0b5268]/10">Edit</button>
+                        {deleteId === entry.id ? (
+                          <>
+                            <button type="button" disabled={busy} onClick={() => void removeKnowledge(entry.id)} className="rounded-lg bg-rose-700 px-2 py-1 text-sm font-semibold text-white disabled:opacity-50">Confirm</button>
+                            <button type="button" onClick={() => setDeleteId("")} className="rounded-lg px-2 py-1 text-sm font-semibold text-[#64777d]">Cancel</button>
+                          </>
+                        ) : (
+                          <button type="button" onClick={() => setDeleteId(entry.id)} className="rounded-lg px-2 py-1 text-sm font-semibold text-rose-700 hover:bg-rose-50">Delete</button>
+                        )}
                       </div>
                     </div>
                     <p className="mt-3 line-clamp-4 whitespace-pre-wrap text-sm text-[#435a62]">{entry.content}</p>
@@ -293,7 +315,8 @@ export default function AdminPage() {
           <section className="rounded-3xl bg-[#f6f1e8] p-8">{busy ? "Loading dashboard…" : "Unable to load dashboard."}</section>
         )}
 
-        <p className="mt-5 text-center text-sm text-white/65">{status}</p>
+        <div role="status" aria-live="polite" className="fixed bottom-5 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full bg-[#102b34] px-5 py-3 text-center text-sm text-white shadow-2xl">{status}</div>
+        <div className="h-16" />
       </div>
       <style jsx global>{`
         .admin-input { width: 100%; border: 1px solid rgba(11,57,71,.2); border-radius: .75rem; background: white; padding: .75rem; outline: none; }
