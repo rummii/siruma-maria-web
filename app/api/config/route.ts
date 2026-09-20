@@ -6,7 +6,9 @@ export async function GET() {
     const config = await getMariaConfig();
     return Response.json({
       ...config,
-      avatarUrl: config.avatarObject ? "/api/avatar" : "/maria-veo-idle.mp4",
+      avatarUrl: config.avatarObject
+        ? `/api/avatar?updated=${encodeURIComponent(config.updatedAt || "")}`
+        : "/maria-veo-idle.mp4",
       voices: MARIA_VOICES.map(({ id, label, languageCode }) => ({ id, label, languageCode })),
     });
   } catch {
