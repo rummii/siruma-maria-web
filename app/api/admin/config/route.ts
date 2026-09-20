@@ -25,6 +25,9 @@ export async function PUT(request: Request) {
     defaultLanguage: String(body.defaultLanguage || current.defaultLanguage).slice(0, 20),
     avatarObject: current.avatarObject,
     avatarType: body.avatarType === "image" ? "image" : "video",
+    responseMode: ["text-and-voice", "voice-only", "text-only"].includes(String(body.responseMode))
+      ? (body.responseMode as MariaConfig["responseMode"])
+      : current.responseMode,
     suggestions: Array.isArray(body.suggestions)
       ? body.suggestions.map(String).map((item) => item.trim()).filter(Boolean).slice(0, 8)
       : current.suggestions,
