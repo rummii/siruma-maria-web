@@ -8,6 +8,7 @@ export type MariaConfig = {
   defaultLanguage: string;
   avatarObject: string;
   avatarType: "video" | "image";
+  responseMode: "text-and-voice" | "voice-only" | "text-only";
   suggestions: string[];
   updatedAt?: string;
 };
@@ -28,6 +29,7 @@ export const DEFAULT_CONFIG: MariaConfig = {
   defaultLanguage: "en-PH",
   avatarObject: "",
   avatarType: "video",
+  responseMode: "text-and-voice",
   suggestions: ["What can I do in Siruma?", "Tell me about paragliding", "Plan a day trip"],
 };
 
