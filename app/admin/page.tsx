@@ -245,9 +245,13 @@ export default function AdminPage() {
               <Label title="Maria’s system instructions">
                 <textarea value={config.systemPrompt} onChange={(event) => setConfig({ ...config, systemPrompt: event.target.value })} rows={6} className="admin-input" />
               </Label>
-              <Label title="Suggested questions — one per line">
-                <textarea value={config.suggestions.join("\n")} onChange={(event) => setConfig({ ...config, suggestions: event.target.value.split("\n") })} rows={4} className="admin-input" />
-              </Label>
+              <div className="rounded-xl border border-[#0b3947]/15 bg-white p-4">
+                <p className="text-sm font-semibold">Visitor question buttons</p>
+                <p className="mt-1 text-sm text-[#64777d]">
+                  Buttons are generated automatically from enabled knowledge-base titles. Add, rename,
+                  disable, or delete a knowledge entry to update the visitor page.
+                </p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Label title="Voice and accent">
                   <select value={config.defaultVoice} onChange={(event) => setConfig({ ...config, defaultVoice: event.target.value })} className="admin-input">
