@@ -1,0 +1,6 @@
+"Lisa - Woman Head with BlendShapes" by skullvez
+Source: https://sketchfab.com/3d-models/lisa-woman-head-with-blendshapes-7670d1c2742b4188a989f1b3205a628b
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+
+Used as a temporary real-time facial animation prototype for the Siruma Maria project.
