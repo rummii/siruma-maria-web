@@ -12,6 +12,7 @@ type PublicConfig = {
   defaultLanguage: string;
   avatarUrl: string;
   avatarType: "video" | "image";
+  responseMode: "text-and-voice" | "voice-only" | "text-only";
   suggestions: string[];
 };
 
@@ -22,6 +23,7 @@ const DEFAULT_CONFIG: PublicConfig = {
   defaultLanguage: "en-PH",
   avatarUrl: "/maria-veo-idle.mp4",
   avatarType: "video",
+  responseMode: "text-and-voice",
   suggestions: ["What can I do in Siruma?", "Tell me about paragliding", "Plan a day trip"],
 };
 
@@ -130,10 +132,19 @@ export default function Home() {
       });
       const data = (await response.json()) as { answer?: string; error?: string };
       const answer = response.ok && data.answer ? data.answer : config.fallbackMessage;
-      setMessages((current) => [...current, { role: "maria", text: answer }]);
-      window.setTimeout(() => speak(answer), 150);
+      if (config.responseMode !== "voice-only") {
+        setMessages((current) => [...current, { role: "maria", text: answer }]);
+      }
+      if (config.responseMode !== "text-only") {
+        window.setTimeout(() => speak(answer), 150);
+      }
     } catch {
-      setMessages((current) => [...current, { role: "maria", text: config.fallbackMessage }]);
+      if (config.responseMode !== "voice-only") {
+        setMessages((current) => [...current, { role: "maria", text: config.fallbackMessage }]);
+      }
+      if (config.responseMode !== "text-only") {
+        window.setTimeout(() => speak(config.fallbackMessage), 150);
+      }
     } finally {
       setThinking(false);
     }
