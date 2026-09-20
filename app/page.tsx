@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 
 type Message = { role: "maria" | "visitor"; text: string };
 const suggestions = ["What can I do in Siruma?", "Tell me about paragliding", "Plan a day trip"];
-const clamp = (value: number, minimum: number, maximum: number) =>
-  Math.min(maximum, Math.max(minimum, value));
 
 function answerFor(question: string) {
   const q = question.toLowerCase();
@@ -26,9 +24,7 @@ export default function Home() {
   const [voiceName, setVoiceName] = useState("Google Filipino female");
   const chatBox = useRef<HTMLDivElement>(null);
   const idleVideo = useRef<HTMLVideoElement>(null);
-  const mouthCanvas = useRef<HTMLCanvasElement>(null);
   const currentAudio = useRef<HTMLAudioElement | null>(null);
-  const stopLipSync = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const panel = chatBox.current;
@@ -46,99 +42,8 @@ export default function Home() {
   useEffect(() => () => {
     const audio = currentAudio.current;
     audio?.pause();
-    stopLipSync.current?.();
     if (audio?.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
   }, []);
-
-  async function beginCanvasLipSync(audio: HTMLAudioElement) {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return () => undefined;
-    }
-
-    const video = idleVideo.current;
-    const canvas = mouthCanvas.current;
-    if (!video || !canvas) return () => undefined;
-
-    const context = new AudioContext();
-    const source = context.createMediaElementSource(audio);
-    const analyser = context.createAnalyser();
-    analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.58;
-    const waveform = new Uint8Array(analyser.fftSize);
-    source.connect(analyser);
-    analyser.connect(context.destination);
-
-    let animationFrame = 0;
-    let smoothedLevel = 0;
-    let stopped = false;
-
-    const render = () => {
-      const width = video.videoWidth;
-      const height = video.videoHeight;
-      const drawing = canvas.getContext("2d");
-
-      if (width && height && drawing) {
-        if (canvas.width !== width || canvas.height !== height) {
-          canvas.width = width;
-          canvas.height = height;
-        }
-        drawing.clearRect(0, 0, width, height);
-
-        analyser.getByteTimeDomainData(waveform);
-        let energy = 0;
-        for (const sample of waveform) {
-          const normalized = (sample - 128) / 128;
-          energy += normalized * normalized;
-        }
-
-        const rms = Math.sqrt(energy / waveform.length);
-        const target = clamp((rms - 0.018) * 7.8, 0, 1);
-        smoothedLevel += (target - smoothedLevel) * (target > smoothedLevel ? 0.5 : 0.24);
-
-        if (smoothedLevel > 0.035) {
-          const centerX = width * 0.5;
-          const centerY = height * 0.267;
-          const patchWidth = width * 0.155;
-          const patchHeight = height * 0.05;
-          const left = centerX - patchWidth / 2;
-          const top = centerY - patchHeight / 2;
-          const halfHeight = patchHeight / 2;
-          const opening = height * 0.0055 * smoothedLevel;
-
-          drawing.save();
-          drawing.beginPath();
-          drawing.ellipse(centerX, centerY, patchWidth * 0.49, patchHeight * 0.56, 0, 0, Math.PI * 2);
-          drawing.clip();
-
-          drawing.fillStyle = `rgba(49, 16, 22, ${0.48 * smoothedLevel})`;
-          drawing.beginPath();
-          drawing.ellipse(centerX, centerY, patchWidth * 0.24, opening * 1.25, 0, 0, Math.PI * 2);
-          drawing.fill();
-
-          drawing.globalAlpha = 0.98;
-          drawing.filter = "blur(0.35px)";
-          drawing.drawImage(video, left, top, patchWidth, halfHeight, left, top - opening, patchWidth, halfHeight);
-          drawing.drawImage(video, left, centerY, patchWidth, halfHeight, left, centerY + opening, patchWidth, halfHeight);
-          drawing.restore();
-        }
-      }
-
-      animationFrame = window.requestAnimationFrame(render);
-    };
-
-    await context.resume();
-    render();
-
-    return () => {
-      if (stopped) return;
-      stopped = true;
-      window.cancelAnimationFrame(animationFrame);
-      canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-      source.disconnect();
-      analyser.disconnect();
-      void context.close();
-    };
-  }
 
   async function speak(text: string) {
     const previousAudio = currentAudio.current;
@@ -146,8 +51,6 @@ export default function Home() {
       previousAudio.pause();
       if (previousAudio.src.startsWith("blob:")) URL.revokeObjectURL(previousAudio.src);
     }
-    stopLipSync.current?.();
-    stopLipSync.current = null;
     setSpeaking(false);
 
     let audioUrl = "";
@@ -163,15 +66,12 @@ export default function Home() {
       const audio = new Audio(audioUrl);
       currentAudio.current = audio;
       setVoiceName(response.headers.get("X-Maria-Voice") || "Google Filipino female");
-      stopLipSync.current = await beginCanvasLipSync(audio);
 
       let finished = false;
       const finish = () => {
         if (finished) return;
         finished = true;
         setSpeaking(false);
-        stopLipSync.current?.();
-        stopLipSync.current = null;
         URL.revokeObjectURL(audioUrl);
       };
 
@@ -181,8 +81,6 @@ export default function Home() {
       await audio.play();
     } catch {
       setSpeaking(false);
-      stopLipSync.current?.();
-      stopLipSync.current = null;
       if (audioUrl) URL.revokeObjectURL(audioUrl);
       setMessages((current) => [...current, { role: "maria", text: "My Google voice is temporarily unavailable. Please try again in a moment." }]);
     }
@@ -240,7 +138,6 @@ export default function Home() {
               preload="auto"
               aria-hidden="true"
             />
-            <canvas ref={mouthCanvas} className="maria-mouth-canvas" aria-hidden="true" />
             <img className="maria-cgi-portrait maria-cgi-fallback" src="/maria-cgi-approved.png" alt="Maria, the Siruma AI Tourism Ambassador, wearing an embroidered cream Filipiniana" />
           </div>
           <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between rounded-2xl border border-white/10 bg-[#061921]/75 p-3.5 backdrop-blur-xl lg:left-8 lg:right-8"><div className="flex items-center gap-3"><div className={`grid size-10 place-items-center rounded-full ${speaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div><div><p className="text-sm font-semibold">Maria</p><p className="text-xs text-white/55">{speaking ? "Speaking now…" : "AI Tourism Ambassador"}</p></div></div><div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${speaking ? "wave" : ""}`} style={{height}} />)}</div></div>
