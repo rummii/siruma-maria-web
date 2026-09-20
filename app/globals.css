@@ -55,17 +55,15 @@ body {
   letter-spacing: -.025em;
 }
 .travel-shell {
-  background:
-    radial-gradient(circle at 12% 42%, rgba(196, 164, 83, .13), transparent 24rem),
-    linear-gradient(180deg, #edf1e8 0%, #f6f3eb 55%, #f1eee5 100%);
+  background: #f4f1e8;
 }
 .travel-hero {
   --parallax-y: 0px;
   position: relative;
-  min-height: clamp(31rem, 72vh, 46rem);
+  min-height: clamp(34rem, 76vh, 48rem);
   overflow: hidden;
-isolation: isolate;
-  background: transparent;
+  isolation: isolate;
+  background: #1b3430;
 }
 .travel-hero-image {
   position: absolute;
@@ -86,39 +84,64 @@ isolation: isolate;
   z-index: 1;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(4, 27, 34, .52) 0%, rgba(4, 34, 39, .28) 43%, rgba(4, 25, 30, .04) 78%),
-    linear-gradient(0deg, rgba(6, 29, 40, .18) 0%, transparent 48%);
+    linear-gradient(90deg, rgba(8, 28, 26, .76) 0%, rgba(8, 31, 28, .46) 48%, rgba(8, 28, 26, .12) 100%),
+    linear-gradient(0deg, rgba(7, 25, 23, .34) 0%, transparent 52%);
   pointer-events: none;
 }
+.brand-mark,
+.hero-status,
+.guide-label,
+.guide-status {
+  background: rgba(9, 31, 29, .48);
+  backdrop-filter: blur(12px);
+}
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+}
+.hero-eyebrow::before {
+  content: "";
+  width: 2.25rem;
+  height: 1px;
+  background: currentColor;
+}
+.hero-title {
+  max-width: 12ch;
+  text-wrap: balance;
+}
 .travel-pill {
-  border: 1px solid rgba(255,255,255,.25);
+  border: 1px solid rgba(255,255,255,.28);
   border-radius: 999px;
-  background: rgba(3,26,31,.22);
-  padding: .65rem 1rem;
-  color: rgba(255,255,255,.9);
-  backdrop-filter: blur(10px);
+  background: rgba(9,31,29,.24);
+  padding: .62rem .95rem;
+  color: rgba(255,255,255,.92);
 }
 .travel-content {
-  margin-top: -3.25rem;
+  margin-top: -3.75rem;
   width: 100%;
 }
 .travel-content > * { min-width: 0; }
 .travel-chat-card,
-.maria-guide-card { contain: paint; }
-.travel-chat-card { min-width: 0; }
+.maria-guide-card {
+  min-width: 0;
+  box-shadow: 0 18px 48px rgba(15, 40, 36, .12);
+}
 .maria-guide-card::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
-  border: 1px solid rgba(255,255,255,.09);
+  border: 1px solid rgba(255,255,255,.12);
   border-radius: inherit;
   pointer-events: none;
 }
 .maria-guide-gradient {
-  background: linear-gradient(180deg, transparent 0%, rgba(5, 27, 34, .86) 35%, #061d28 100%);
+  background: linear-gradient(180deg, transparent 0%, rgba(7, 27, 25, .82) 34%, #102a27 100%);
 }
-.travel-chat-card { backdrop-filter: blur(18px); }
+.travel-chat-card {
+  backdrop-filter: blur(12px);
+}
 
 .maria-cgi-frame {
   position: absolute;
@@ -152,7 +175,7 @@ isolation: isolate;
 
 @media (min-width: 1536px) {
   .travel-hero-image { object-position: center 55%; }
-  .travel-content { max-width: 90rem; }
+  .travel-content { max-width: 88rem; }
 }
 @media (max-width: 1180px) and (min-width: 1024px) {
   .travel-content { grid-template-columns: .9fr 1.1fr; }
