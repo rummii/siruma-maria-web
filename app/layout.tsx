@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CacheReset } from "@/components/cache-reset";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-PH">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased"><CacheReset />{children}</body>
     </html>
   );
 }
