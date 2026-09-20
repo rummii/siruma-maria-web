@@ -141,14 +141,19 @@ export default function AdminPage() {
     event.preventDefault();
     setBusy(true);
     try {
-      await api("/api/admin/knowledge", {
+      const saved = await api("/api/admin/knowledge", {
         method: "POST",
         body: JSON.stringify(knowledge),
       });
+      if (saved.config) setConfig(saved.config);
       setKnowledge({ id: "", title: "", content: "", enabled: true });
       const data = await api("/api/admin/knowledge");
       setEntries(data.entries);
-      setStatus("Knowledge entry saved.");
+      setStatus(
+        saved.suggestionRenamed
+          ? "Knowledge entry and matching suggested question updated."
+          : "Knowledge entry saved.",
+      );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Knowledge save failed");
     } finally {
