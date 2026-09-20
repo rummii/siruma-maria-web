@@ -23,6 +23,14 @@ function parseStructuredAnswer(raw: string): StructuredAnswer | null {
   }
 }
 
+function normalizeKnowledgeKey(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+    .trim();
+}
+
 export async function POST(request: Request) {
   let question = "";
   try {
@@ -37,8 +45,20 @@ export async function POST(request: Request) {
 
   try {
     const [config, entries] = await Promise.all([getMariaConfig(), listKnowledge()]);
-    const knowledge = entries
-      .filter((entry) => entry.enabled)
+    const enabledEntries = entries.filter((entry) => entry.enabled);
+    const exactMatch = enabledEntries.find(
+      (entry) => normalizeKnowledgeKey(entry.title) === normalizeKnowledgeKey(question),
+    );
+
+    if (exactMatch?.content.trim()) {
+      return Response.json({
+        answer: exactMatch.content.trim(),
+        source: "knowledge-base" satisfies AnswerSource,
+        matchedEntry: exactMatch.id,
+      });
+    }
+
+    const knowledge = enabledEntries
       .map((entry) => `Title: ${entry.title}\nContent: ${entry.content}`)
       .join("\n\n");
 
