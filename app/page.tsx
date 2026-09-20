@@ -221,7 +221,7 @@ export default function Home() {
   return (
     <main className="travel-shell min-h-screen text-[#102b34]">
       <header ref={heroRef} className="travel-hero">
-        <div className="travel-hero-overlay" aria-hidden="true" />
+        <img className="travel-hero-image" src="/siruma-rolling-hills.png" alt="" aria-hidden="true" />
         <div className="relative z-10 mx-auto max-w-7xl px-5 pb-14 pt-5 lg:px-10 lg:pb-20">
           <nav className="flex items-center justify-between text-white">
             <div className="flex items-center gap-3">
