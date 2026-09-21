@@ -58,7 +58,6 @@ body {
   background: #f4f1e8;
 }
 .travel-hero {
-  --parallax-y: 0px;
   position: relative;
   min-height: clamp(32rem, 68vh, 42rem);
   overflow: hidden;
@@ -68,14 +67,14 @@ body {
 .travel-hero-image {
   position: absolute;
   z-index: 0;
-  inset: -8% 0;
+  inset: 0;
   background-image: url("/siruma-rolling-hills.png");
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center 56%;
-  transform: translate3d(0, var(--parallax-y), 0) scale(1.035);
+  transform: none;
   transform-origin: center;
-  will-change: transform;
+  will-change: auto;
 }
 .travel-hero::after {
   content: "";
@@ -228,7 +227,6 @@ body {
   .travel-chat-card { min-height: 33rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .travel-hero { --parallax-y: 0px; }
   .travel-hero-image {
     transform: scale(1.03);
     will-change: auto;
