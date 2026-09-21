@@ -88,7 +88,6 @@ body {
   pointer-events: none;
 }
 .brand-mark,
-.hero-status,
 .guide-label,
 .guide-status {
   background: rgba(9, 31, 29, .48);
@@ -237,4 +236,11 @@ body {
   .maria-cgi-video { display: none; }
   .maria-cgi-fallback { display: block; }
   .wave { animation: none; }
+}
+
+.hero-status {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  border: none;
+  box-shadow: none;
 }
