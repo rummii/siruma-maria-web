@@ -54,8 +54,18 @@ export default function AdminPage() {
         ...(init.headers || {}),
       },
     });
-    const data = await response.json() as Record<string, any>;
-    if (!response.ok) throw new Error(String(data.error || "Request failed"));
+    const raw = await response.text();
+    let data: Record<string, any> = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw) as Record<string, any>;
+      } catch {
+        if (response.ok) throw new Error("The server returned an invalid response");
+      }
+    }
+    if (!response.ok) {
+      throw new Error(String(data.error || raw || `Request failed (${response.status})`));
+    }
     return data;
   }, [token]);
 
