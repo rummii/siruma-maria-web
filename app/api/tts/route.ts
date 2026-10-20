@@ -1,82 +1,8 @@
-import { googleAccessToken } from "@/lib/google-cloud";
-import { getMariaConfig } from "@/lib/maria-store";
-import { voiceById } from "@/lib/voices";
-
-const MAX_TEXT_LENGTH = 1000;
-
-function toSpeechText(value: string) {
-  return value
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/https?:\/\/\S+/gi, " ")
-    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
-    .replace(/^\s*[-+*]\s+/gm, "")
-    .replace(/^\s*\d+[.)]\s+/gm, "")
-    .replace(/[*_~`>|{}\[\]\\]/g, " ")
-    .replace(/&/g, " and ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export async function POST(request: Request) {
-  let text = "";
-  let requestedVoice = "";
-  try {
-    const body = (await request.json()) as { text?: unknown; voice?: unknown };
-    text = typeof body.text === "string" ? toSpeechText(body.text).slice(0, MAX_TEXT_LENGTH) : "";
-    requestedVoice = typeof body.voice === "string" ? body.voice : "";
-  } catch {
-    return Response.json({ error: "Invalid request" }, { status: 400 });
-  }
-  if (!text) {
-    return Response.json({ error: "Text must contain speakable content" }, { status: 400 });
-  }
-
-  let config;
-  try {
-    config = await getMariaConfig();
-  } catch {
-    config = null;
-  }
-  const voice = voiceById(requestedVoice || config?.defaultVoice);
-
-  let authorization = "";
-  if (process.env.GOOGLE_TTS_API_KEY) {
-    authorization = `X-Goog-Api-Key ${process.env.GOOGLE_TTS_API_KEY}`;
-  } else {
-    try {
-      authorization = `Bearer ${await googleAccessToken()}`;
-    } catch (error) {
-      console.error("Maria TTS authentication failed", error);
-      return Response.json({ error: "Voice service is not configured" }, { status: 503 });
-    }
-  }
-
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (authorization.startsWith("Bearer ")) headers.Authorization = authorization;
-  else headers["X-Goog-Api-Key"] = authorization.slice("X-Goog-Api-Key ".length);
-
-  const googleResponse = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      input: { text },
-      voice: { languageCode: voice.languageCode, name: voice.name, ssmlGender: voice.gender },
-      audioConfig: { audioEncoding: "MP3", speakingRate: 0.98, pitch: 0 },
-    }),
-  });
-
-  if (!googleResponse.ok) return Response.json({ error: "Voice generation failed" }, { status: 502 });
-  const data = (await googleResponse.json()) as { audioContent?: string };
-  if (!data.audioContent) return Response.json({ error: "No audio returned" }, { status: 502 });
-
-  const bytes = Buffer.from(data.audioContent, "base64");
-  return new Response(bytes, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "private, max-age=300",
-      "X-Maria-Voice": voice.name,
+export async function POST() {
+  return Response.json(
+    {
+      error: "Server-side TTS is disabled. Maria uses the visitor browser's configured speech voice.",
     },
-  });
+    { status: 410 },
+  );
 }
