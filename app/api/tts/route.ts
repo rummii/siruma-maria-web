@@ -1,3 +1,4 @@
+import { googleAccessToken } from "@/lib/google-cloud";
 import { getMariaConfig } from "@/lib/maria-store";
 import { voiceById } from "@/lib/voices";
 
@@ -45,15 +46,9 @@ export async function POST(request: Request) {
     authorization = `X-Goog-Api-Key ${process.env.GOOGLE_TTS_API_KEY}`;
   } else {
     try {
-      const tokenResponse = await fetch(
-        "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
-        { headers: { "Metadata-Flavor": "Google" }, cache: "no-store" },
-      );
-      if (!tokenResponse.ok) throw new Error("Unable to obtain Google identity token");
-      const tokenData = (await tokenResponse.json()) as { access_token?: string };
-      if (!tokenData.access_token) throw new Error("Google identity token was empty");
-      authorization = `Bearer ${tokenData.access_token}`;
-    } catch {
+      authorization = `Bearer ${await googleAccessToken()}`;
+    } catch (error) {
+      console.error("Maria TTS authentication failed", error);
       return Response.json({ error: "Voice service is not configured" }, { status: 503 });
     }
   }
