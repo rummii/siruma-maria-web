@@ -1,4 +1,4 @@
-import { googleJson, projectId } from "@/lib/google-cloud";
+import { getRailwayObject, putRailwayObject } from "@/lib/railway-storage";
 
 export type MariaConfig = {
   welcomeMessage: string;
@@ -25,120 +25,93 @@ export const DEFAULT_CONFIG: MariaConfig = {
   welcomeMessage: "Magandang araw! I’m Maria, your AI Tourism Ambassador. How may I help you discover Siruma today?",
   fallbackMessage: "I’m sorry, I don’t have enough information to answer that yet. Please ask about Siruma’s destinations and activities.",
   systemPrompt: "You are Maria, Siruma’s warm and accurate tourism ambassador. Treat the official knowledge base as authoritative for Siruma products, services, and official information. For broader non-commercial visitor questions, provide cautious general guidance when reliable. Keep answers concise and visitor-friendly.",
-  defaultVoice: "filipino-female",
-  defaultLanguage: "en-PH",
+  defaultVoice: "us-female",
+  defaultLanguage: "en-US",
   avatarObject: "",
   avatarType: "video",
   responseMode: "text-and-voice",
   suggestions: ["What can I do in Siruma?", "Tell me about paragliding", "Plan a day trip"],
 };
 
-type FirestoreValue = {
-  stringValue?: string;
-  booleanValue?: boolean;
-  integerValue?: string;
-  doubleValue?: number;
-  nullValue?: null;
-  arrayValue?: { values?: FirestoreValue[] };
-  mapValue?: { fields?: Record<string, FirestoreValue> };
+type MariaData = {
+  config: MariaConfig;
+  knowledge: KnowledgeEntry[];
 };
 
-type FirestoreDocument = {
-  name?: string;
-  fields?: Record<string, FirestoreValue>;
-};
+const DATA_OBJECT = "maria/data.json";
+let mutationQueue: Promise<void> = Promise.resolve();
 
-function encode(value: unknown): FirestoreValue {
-  if (value === null || value === undefined) return { nullValue: null };
-  if (typeof value === "string") return { stringValue: value };
-  if (typeof value === "boolean") return { booleanValue: value };
-  if (typeof value === "number") {
-    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+function defaultData(): MariaData {
+  return { config: { ...DEFAULT_CONFIG }, knowledge: [] };
+}
+
+function normalizeData(value: Partial<MariaData> | null): MariaData {
+  return {
+    config: { ...DEFAULT_CONFIG, ...(value?.config || {}) },
+    knowledge: Array.isArray(value?.knowledge) ? value.knowledge : [],
+  };
+}
+
+async function readData(): Promise<MariaData> {
+  const response = await getRailwayObject(DATA_OBJECT);
+  if (response.status === 404) return defaultData();
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Railway data read failed (${response.status}): ${details.slice(0, 300)}`);
   }
-  if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
-  const fields: Record<string, FirestoreValue> = {};
-  for (const [key, item] of Object.entries(value as Record<string, unknown>)) fields[key] = encode(item);
-  return { mapValue: { fields } };
+  return normalizeData((await response.json()) as Partial<MariaData>);
 }
 
-function decode(value: FirestoreValue): unknown {
-  if ("stringValue" in value) return value.stringValue || "";
-  if ("booleanValue" in value) return Boolean(value.booleanValue);
-  if ("integerValue" in value) return Number(value.integerValue);
-  if ("doubleValue" in value) return value.doubleValue;
-  if ("arrayValue" in value) return (value.arrayValue?.values || []).map(decode);
-  if ("mapValue" in value) return decodeFields(value.mapValue?.fields || {});
-  return null;
+async function writeData(data: MariaData) {
+  await putRailwayObject(
+    DATA_OBJECT,
+    Buffer.from(JSON.stringify(data)),
+    "application/json; charset=utf-8",
+  );
 }
 
-function decodeFields(fields: Record<string, FirestoreValue>) {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(fields)) result[key] = decode(value);
+async function mutate<T>(operation: (data: MariaData) => T | Promise<T>): Promise<T> {
+  let result!: T;
+  const next = mutationQueue.then(async () => {
+    const data = await readData();
+    result = await operation(data);
+    await writeData(data);
+  });
+  mutationQueue = next.then(() => undefined, () => undefined);
+  await next;
   return result;
 }
 
-function baseUrl() {
-  return `https://firestore.googleapis.com/v1/projects/${projectId()}/databases/(default)/documents`;
-}
-
-async function getDocument(path: string) {
-  const token = await import("@/lib/google-cloud").then((module) => module.googleAccessToken());
-  const response = await fetch(`${baseUrl()}/${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`Firestore read failed: ${response.status}`);
-  const document = (await response.json()) as FirestoreDocument;
-  return decodeFields(document.fields || {});
-}
-
-async function setDocument(path: string, value: Record<string, unknown>) {
-  return googleJson<FirestoreDocument>(`${baseUrl()}/${path}`, {
-    method: "PATCH",
-    body: JSON.stringify({ fields: encode(value).mapValue?.fields || {} }),
-  });
-}
-
 export async function getMariaConfig(): Promise<MariaConfig> {
-  const stored = await getDocument("maria_config/public");
-  return { ...DEFAULT_CONFIG, ...(stored || {}) } as MariaConfig;
+  return (await readData()).config;
 }
 
 export async function saveMariaConfig(config: MariaConfig) {
-  const saved = { ...config, updatedAt: new Date().toISOString() };
-  await setDocument("maria_config/public", saved as unknown as Record<string, unknown>);
-  return saved;
+  return mutate((data) => {
+    const saved = { ...config, updatedAt: new Date().toISOString() };
+    data.config = saved;
+    return saved;
+  });
 }
 
 export async function listKnowledge(): Promise<KnowledgeEntry[]> {
-  const token = await import("@/lib/google-cloud").then((module) => module.googleAccessToken());
-  const response = await fetch(`${baseUrl()}/maria_knowledge?pageSize=100`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (response.status === 404) return [];
-  if (!response.ok) throw new Error(`Firestore list failed: ${response.status}`);
-  const data = (await response.json()) as { documents?: FirestoreDocument[] };
-  return (data.documents || []).map((document) => {
-    const values = decodeFields(document.fields || {});
-    const id = document.name?.split("/").pop() || "";
-    return { id, ...values } as KnowledgeEntry;
-  });
+  const entries = (await readData()).knowledge;
+  return [...entries].sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export async function saveKnowledge(entry: KnowledgeEntry) {
-  const id = entry.id || crypto.randomUUID();
-  const saved = { ...entry, id, updatedAt: new Date().toISOString() };
-  await setDocument(`maria_knowledge/${encodeURIComponent(id)}`, saved as unknown as Record<string, unknown>);
-  return saved;
+  return mutate((data) => {
+    const id = entry.id || crypto.randomUUID();
+    const saved = { ...entry, id, updatedAt: new Date().toISOString() };
+    const index = data.knowledge.findIndex((item) => item.id === id);
+    if (index >= 0) data.knowledge[index] = saved;
+    else data.knowledge.push(saved);
+    return saved;
+  });
 }
 
 export async function deleteKnowledge(id: string) {
-  const token = await import("@/lib/google-cloud").then((module) => module.googleAccessToken());
-  const response = await fetch(`${baseUrl()}/maria_knowledge/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+  await mutate((data) => {
+    data.knowledge = data.knowledge.filter((entry) => entry.id !== id);
   });
-  if (!response.ok && response.status !== 404) throw new Error(`Firestore delete failed: ${response.status}`);
 }
