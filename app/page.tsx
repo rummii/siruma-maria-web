@@ -19,8 +19,8 @@ type PublicConfig = {
 const DEFAULT_CONFIG: PublicConfig = {
   welcomeMessage: "Magandang araw! I’m Maria, your AI Tourism Ambassador. How may I help you discover Siruma today?",
   fallbackMessage: "I’m sorry, I don’t have enough information to answer that yet.",
-  defaultVoice: "filipino-female",
-  defaultLanguage: "en-PH",
+  defaultVoice: "us-female",
+  defaultLanguage: "en-US",
   avatarUrl: "/maria-veo-idle.mp4",
   avatarType: "video",
   responseMode: "text-and-voice",
@@ -34,10 +34,9 @@ export default function Home() {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [thinking, setThinking] = useState(false);
-  const [voiceName, setVoiceName] = useState("Google Filipino female");
+  const [voiceName, setVoiceName] = useState("Browser US English voice");
   const chatBox = useRef<HTMLDivElement>(null);
   const idleVideo = useRef<HTMLVideoElement>(null);
-  const currentAudio = useRef<HTMLAudioElement | null>(null);
   const configRef = useRef(DEFAULT_CONFIG);
 
   useEffect(() => {
@@ -96,48 +95,34 @@ export default function Home() {
   }, [speaking]);
 
   useEffect(() => () => {
-    const audio = currentAudio.current;
-    audio?.pause();
-    if (audio?.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
+    window.speechSynthesis?.cancel();
   }, []);
 
-  async function speak(text: string) {
-    const previousAudio = currentAudio.current;
-    if (previousAudio) {
-      previousAudio.pause();
-      if (previousAudio.src.startsWith("blob:")) URL.revokeObjectURL(previousAudio.src);
-    }
-    setSpeaking(false);
+  function speak(text: string) {
+    if (!("speechSynthesis" in window)) return;
 
-    let audioUrl = "";
-    try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: config.defaultVoice }),
-      });
-      if (!response.ok) throw new Error("Voice request failed");
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = config.defaultLanguage || "en-US";
+    utterance.rate = 0.98;
+    utterance.pitch = 1;
 
-      audioUrl = URL.createObjectURL(await response.blob());
-      const audio = new Audio(audioUrl);
-      currentAudio.current = audio;
-      setVoiceName(response.headers.get("X-Maria-Voice") || "Google Cloud voice");
+    const language = utterance.lang.toLowerCase();
+    const voices = window.speechSynthesis.getVoices();
+    const preferredNames = /aria|ava|female|jenny|samantha|susan|victoria|zira/i;
+    const voice =
+      voices.find((candidate) =>
+        candidate.lang.toLowerCase() === language && preferredNames.test(candidate.name),
+      ) ||
+      voices.find((candidate) => candidate.lang.toLowerCase() === language) ||
+      voices.find((candidate) => candidate.lang.toLowerCase().startsWith(language.split("-")[0]));
 
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
-        setSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-      audio.onplay = () => setSpeaking(true);
-      audio.onended = finish;
-      audio.onerror = finish;
-      await audio.play();
-    } catch {
-      setSpeaking(false);
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-    }
+    if (voice) utterance.voice = voice;
+    setVoiceName(voice?.name || `Browser ${utterance.lang} voice`);
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
   }
 
   async function ask(text: string) {
