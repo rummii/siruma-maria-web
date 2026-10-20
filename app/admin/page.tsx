@@ -235,9 +235,9 @@ export default function AdminPage() {
         {!token ? (
           <section className="rounded-3xl bg-[#f6f1e8] p-8 shadow-2xl">
             <h2 className="font-serif text-2xl">Administrator sign-in</h2>
-            <p className="mt-2 max-w-xl text-[#536970]">Only Google accounts listed in the Cloud Run ADMIN_EMAILS setting can access this dashboard.</p>
+            <p className="mt-2 max-w-xl text-[#536970]">Only Google accounts listed in the Railway ADMIN_EMAILS setting can access this dashboard.</p>
             <div id="google-admin-signin" className="mt-6" />
-            {!clientId && <p className="mt-4 text-sm text-rose-700">GOOGLE_CLIENT_ID is not configured on Cloud Run.</p>}
+            {!clientId && <p className="mt-4 text-sm text-rose-700">GOOGLE_CLIENT_ID is not configured on Railway.</p>}
           </section>
         ) : config ? (
           <div className="grid gap-6 lg:grid-cols-2">
