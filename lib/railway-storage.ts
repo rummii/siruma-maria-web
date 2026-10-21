@@ -76,7 +76,7 @@ async function signedRequest(
       Authorization:
         `AWS4-HMAC-SHA256 Credential=${accessKey}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
     },
-    body,
+    body: body ? (Uint8Array.from(body).buffer as ArrayBuffer) : undefined,
     cache: "no-store",
   });
 }
