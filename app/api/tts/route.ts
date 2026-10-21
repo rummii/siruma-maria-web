@@ -65,6 +65,7 @@ export async function POST(request: Request) {
         "Content-Type": upstream.headers.get("content-type") || "audio/mpeg",
         "Cache-Control": "no-store",
         "X-Maria-Voice": model,
+        "X-Maria-Voice-Provider": "Deepgram",
       },
     });
   } catch (error) {
