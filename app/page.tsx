@@ -37,6 +37,7 @@ export default function Home() {
   const [voiceName, setVoiceName] = useState("Browser US English voice");
   const chatBox = useRef<HTMLDivElement>(null);
   const idleVideo = useRef<HTMLVideoElement>(null);
+  const generatedAudio = useRef<HTMLAudioElement | null>(null);
   const configRef = useRef(DEFAULT_CONFIG);
 
   useEffect(() => {
@@ -95,16 +96,27 @@ export default function Home() {
   }, [speaking]);
 
   useEffect(() => () => {
+    generatedAudio.current?.pause();
+    generatedAudio.current = null;
     window.speechSynthesis?.cancel();
   }, []);
 
-  function speak(text: string) {
+  function stopCurrentVoice() {
+    if (generatedAudio.current) {
+      generatedAudio.current.pause();
+      generatedAudio.current.src = "";
+      generatedAudio.current = null;
+    }
+    window.speechSynthesis?.cancel();
+    setSpeaking(false);
+  }
+
+  function speakWithBrowserVoice(text: string) {
     if (!("speechSynthesis" in window)) return;
 
-    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = config.defaultLanguage || "en-US";
-    utterance.rate = 0.98;
+    utterance.rate = 0.96;
     utterance.pitch = 1;
 
     const language = utterance.lang.toLowerCase();
@@ -123,6 +135,44 @@ export default function Home() {
     utterance.onend = () => setSpeaking(false);
     utterance.onerror = () => setSpeaking(false);
     window.speechSynthesis.speak(utterance);
+  }
+
+  async function speak(text: string) {
+    stopCurrentVoice();
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!response.ok) throw new Error("Premium voice unavailable");
+
+      const audioUrl = URL.createObjectURL(await response.blob());
+      const audio = new Audio(audioUrl);
+      generatedAudio.current = audio;
+      setVoiceName(response.headers.get("X-Maria-Voice") || "Deepgram Aura 2");
+
+      const release = () => {
+        URL.revokeObjectURL(audioUrl);
+        if (generatedAudio.current === audio) generatedAudio.current = null;
+      };
+
+      audio.onplay = () => setSpeaking(true);
+      audio.onended = () => {
+        setSpeaking(false);
+        release();
+      };
+      audio.onerror = () => {
+        setSpeaking(false);
+        release();
+        speakWithBrowserVoice(text);
+      };
+
+      await audio.play();
+    } catch {
+      speakWithBrowserVoice(text);
+    }
   }
 
   async function ask(text: string) {
