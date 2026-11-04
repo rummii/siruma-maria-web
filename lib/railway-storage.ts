@@ -18,11 +18,20 @@ function encodedPath(value: string) {
   return value.split("/").map((part) => encodeURIComponent(part)).join("/");
 }
 
-function objectUrl(key: string) {
+type UrlStyle = "path" | "virtual-host";
+
+function objectUrl(key: string, style: UrlStyle) {
   const endpoint = new URL(required("RAILWAY_S3_ENDPOINT"));
   const bucket = required("RAILWAY_S3_BUCKET");
   const basePath = endpoint.pathname.replace(/\/$/, "");
-  endpoint.pathname = `${basePath}/${encodeURIComponent(bucket)}/${encodedPath(key)}`;
+  if (style === "virtual-host") {
+    // Virtual-hosted style: https://bucket.endpoint/key
+    endpoint.host = `${bucket}.${endpoint.host}`;
+    endpoint.pathname = `/${encodedPath(key)}`;
+  } else {
+    // Path style: https://endpoint/bucket/key
+    endpoint.pathname = `${basePath}/${encodeURIComponent(bucket)}/${encodedPath(key)}`;
+  }
   endpoint.search = "";
   return endpoint;
 }
@@ -35,8 +44,11 @@ async function signedRequest(
 ) {
   const accessKey = required("RAILWAY_S3_ACCESS_KEY_ID");
   const secretKey = required("RAILWAY_S3_SECRET_ACCESS_KEY");
-  const region = process.env.RAILWAY_S3_REGION || "sin";
-  const url = objectUrl(key);
+  // Accept "auto" as region (Tigris convention); fall back to "sin" for backward compat
+  const regionRaw = process.env.RAILWAY_S3_REGION?.trim() || "sin";
+  const region = regionRaw === "auto" ? "sin" : regionRaw;
+  const style: UrlStyle = (process.env.RAILWAY_S3_URL_STYLE?.trim() as UrlStyle) || "path";
+  const url = objectUrl(key, style);
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const dateStamp = amzDate.slice(0, 8);
