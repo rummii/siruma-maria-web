@@ -1,4 +1,4 @@
-import { getMariaConfig, listKnowledge } from "@/lib/maria-store";
+﻿import { getMariaConfig, listKnowledge } from "@/lib/maria-store";
 import { MARIA_VOICES } from "@/lib/voices";
 import { getRailwayObject } from "@/lib/railway-storage";
 
@@ -28,7 +28,7 @@ export async function GET() {
         avatarUrl: config.avatarObject
           ? `/api/avatar?updated=${encodeURIComponent(config.updatedAt || "")}`
           : "/maria-veo-idle.mp4",
-        voices: MARIA_VOICES.map(({ id, label, languageCode }) => ({ id, label, languageCode })),
+        voices: MARIA_VOICES.map(({ id, label, languageCode, provider }) => ({ id, label, languageCode, provider })),
       },
       { headers: NO_CACHE_HEADERS },
     );

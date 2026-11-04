@@ -70,13 +70,11 @@ export default function Home() {
     };
 
     void refreshConfig();
-    const interval = window.setInterval(() => void refreshConfig(), 5000);
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
       active = false;
-      window.clearInterval(interval);
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
