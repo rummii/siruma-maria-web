@@ -137,7 +137,9 @@ export async function POST(request: Request) {
     );
   }
 
-  return new Response(audio, {
+  // Convert Buffer to Uint8Array for the Response body.
+  const uint8Array = new Uint8Array(audio);
+  return new Response(uint8Array, {
     status: 200,
     headers: {
       "Content-Type": "audio/mpeg",
