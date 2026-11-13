@@ -1,4 +1,4 @@
-﻿import { requireAdmin, unauthorized } from "@/lib/admin-auth";
+import { requireAdmin, unauthorized } from "@/lib/admin-auth";
 import { getMariaConfig, saveMariaConfig, type MariaConfigWithProvider } from "@/lib/maria-store";
 import { MARIA_VOICES } from "@/lib/voices";
 
@@ -35,7 +35,7 @@ export async function PUT(request: Request) {
     fallbackMessage: String(body.fallbackMessage || current.fallbackMessage).slice(0, 1000),
     systemPrompt: String(body.systemPrompt || current.systemPrompt).slice(0, 5000),
     defaultVoice: voiceIds.has(String(body.defaultVoice)) ? String(body.defaultVoice) : current.defaultVoice,
-    defaultVoiceProvider: validProvider(body.defaultVoice?.provider) ? (body.defaultVoice?.provider ?? undefined) : current.defaultVoiceProvider,
+    defaultVoiceProvider: validProvider(body.defaultVoiceProvider) ? body.defaultVoiceProvider : current.defaultVoiceProvider,
     defaultLanguage: String(body.defaultLanguage || current.defaultLanguage).slice(0, 20),
     avatarObject: current.avatarObject,
     avatarType: body.avatarType === "image" ? "image" : "video",
