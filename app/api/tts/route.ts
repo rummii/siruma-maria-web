@@ -2,6 +2,7 @@
 import { MARIA_VOICES, voiceById } from "@/lib/voices";
 
 const MAX_TEXT_LENGTH = 4000;
+const SYNTHESIS_TIMEOUT_MS = 30_000;
 
 function prepareForSpeech(value: string) {
   return value
@@ -42,21 +43,31 @@ async function googleSynthesize(text: string, voiceName: string, languageCode: s
   if (authorization.startsWith("Bearer ")) headers.Authorization = authorization;
   else headers["X-Goog-Api-Key"] = authorization.slice("X-Goog-Api-Key ".length);
 
-  const googleResponse = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      input: { text },
-      voice: { languageCode, name: voiceName, ssmlGender: "FEMALE" },
-      audioConfig: { audioEncoding: "MP3", speakingRate: 0.96 },
-    }),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
+  try {
+    const googleResponse = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode, name: voiceName, ssmlGender: "FEMALE" },
+        audioConfig: { audioEncoding: "MP3", speakingRate: 0.96 },
+      }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
 
-  if (!googleResponse.ok) return null;
-  const data = (await googleResponse.json()) as { audioContent?: string };
-  if (!data.audioContent) return null;
-  return Buffer.from(data.audioContent, "base64");
+    if (!googleResponse.ok) return null;
+    const data = (await googleResponse.json()) as { audioContent?: string };
+    if (!data.audioContent) return null;
+    return Buffer.from(data.audioContent, "base64");
+  } catch (error) {
+    if (controller.signal.aborted) console.error("Google TTS synthesis timed out", { timeoutMs: SYNTHESIS_TIMEOUT_MS });
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function deepgramSynthesize(text: string, model: string) {
@@ -67,15 +78,25 @@ async function deepgramSynthesize(text: string, model: string) {
   endpoint.searchParams.set("model", model);
   endpoint.searchParams.set("encoding", "mp3");
 
-  const upstream = await fetch(endpoint, {
-    method: "POST",
-    headers: { Authorization: `Token ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-    cache: "no-store",
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(endpoint, {
+      method: "POST",
+      headers: { Authorization: `Token ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
 
-  if (!upstream.ok || !upstream.body) return null;
-  return Buffer.from(await upstream.arrayBuffer());
+    if (!upstream.ok || !upstream.body) return null;
+    return Buffer.from(await upstream.arrayBuffer());
+  } catch (error) {
+    if (controller.signal.aborted) console.error("Deepgram TTS synthesis timed out", { timeoutMs: SYNTHESIS_TIMEOUT_MS });
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function POST(request: Request) {
