@@ -93,11 +93,12 @@ export async function POST(request: Request) {
   try {
     const [config, entries] = await Promise.all([getMariaConfig(), listKnowledge()]);
     const enabledEntries = entries.filter((entry) => entry.enabled);
+    const exactMatch = enabledEntries.find(
+      (entry) => normalizeKnowledgeKey(entry.title) === normalizeKnowledgeKey(question),
+    );
+    const localMatch = localKnowledgeMatch(question, enabledEntries);
     const apiKey = process.env.DEEPSEEK_API_KEY || "";
     if (!apiKey) {
-      const exactMatch = enabledEntries.find(
-        (entry) => normalizeKnowledgeKey(entry.title) === normalizeKnowledgeKey(question),
-      );
       if (exactMatch?.content.trim()) {
         return Response.json({
           answer: exactMatch.content.trim(),
@@ -107,13 +108,30 @@ export async function POST(request: Request) {
         });
       }
 
-      const match = localKnowledgeMatch(question, enabledEntries);
       return Response.json(
-        match
-          ? { answer: match.content.trim(), source: "knowledge-base" satisfies AnswerSource, matchedEntry: match.id, voiceId: config.defaultVoice }
+        localMatch
+          ? { answer: localMatch.content.trim(), source: "knowledge-base" satisfies AnswerSource, matchedEntry: localMatch.id, voiceId: config.defaultVoice }
           : { answer: config.fallbackMessage, source: "fallback" satisfies AnswerSource, voiceId: config.defaultVoice },
       );
     }
+
+    const getMatchedKnowledgeResponse = () => {
+      if (!exactMatch && !localMatch) {
+        return Response.json({
+          answer: config.fallbackMessage,
+          source: "fallback" satisfies AnswerSource,
+          voiceId: config.defaultVoice,
+        });
+      }
+
+      const entry = exactMatch || localMatch;
+      return Response.json({
+        answer: entry?.content.trim() || config.fallbackMessage,
+        source: entry?.content.trim() ? "knowledge-base" satisfies AnswerSource : "fallback" satisfies AnswerSource,
+        matchedEntry: entry?.id,
+        voiceId: config.defaultVoice,
+      });
+    };
 
     const selectedEntries = relevantKnowledge(question, enabledEntries);
     const knowledge = selectedEntries
@@ -169,7 +187,7 @@ Configured fallback message: ${config.fallbackMessage}`;
     const structured = parseStructuredAnswer(result.choices?.[0]?.message?.content?.trim() || "");
 
     if (!structured?.answer || structured.source === "fallback") {
-      return Response.json({ answer: config.fallbackMessage, source: "fallback" satisfies AnswerSource, voiceId: config.defaultVoice });
+      return getMatchedKnowledgeResponse();
     }
 
     const voiceId = typeof structured.voiceId === "string" &&
@@ -187,11 +205,7 @@ Configured fallback message: ${config.fallbackMessage}`;
     }
 
     if (structured.source !== "knowledge-base") {
-      return Response.json({
-        answer: config.fallbackMessage,
-        source: "fallback" satisfies AnswerSource,
-        voiceId: config.defaultVoice,
-      });
+      return getMatchedKnowledgeResponse();
     }
 
     return Response.json({
