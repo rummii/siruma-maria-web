@@ -10,11 +10,6 @@ const MAX_HISTORY_MESSAGE_LENGTH = 1000;
 const RATE_LIMIT_MESSAGE =
   "You are sending messages a little too quickly. Please wait a moment and try again.";
 
-function describeError(error: unknown) {
-  const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  return text.slice(0, 300);
-}
-
 function sanitizeHistory(raw: unknown, maxTurns: number): ChatTurn[] {
   if (!Array.isArray(raw) || maxTurns <= 0) return [];
 
@@ -90,10 +85,6 @@ export async function POST(request: Request) {
     return Response.json(localAnswer());
   }
 
-  // Temporary diagnostics: this service does not surface console output, so the
-  // degrade reason is echoed when explicitly requested.
-  const debug = new URL(request.url).searchParams.get("debug") === "1";
-
   try {
     const answer = await answerWithMaria({
       apiKey,
@@ -104,18 +95,11 @@ export async function POST(request: Request) {
       question,
       allowWebSearch: config.webSearchEnabled !== false,
     });
-    if (!answer) {
-      return Response.json(
-        debug ? { ...localAnswer(), debug: { usedModel: false, reason: "compose-returned-null" } } : localAnswer(),
-      );
-    }
-    return Response.json(debug ? { ...answer, debug: { usedModel: true } } : answer);
+    return Response.json(answer ?? localAnswer());
   } catch (error) {
     // A model or search outage must not break the conversation: degrade to the
     // best local knowledge-base match instead of returning a 5xx.
     console.error("Maria chat failed", error);
-    return Response.json(
-      debug ? { ...localAnswer(), debug: { usedModel: false, reason: describeError(error) } } : localAnswer(),
-    );
+    return Response.json(localAnswer());
   }
 }
