@@ -5,6 +5,20 @@ import { Compass, MapPin, Mic, MicOff, Send, Sparkles, Volume2 } from "lucide-re
 import { Button } from "@/components/ui/button";
 
 type Message = { role: "maria" | "visitor"; text: string };
+type PublicKnowledgeEntry = { id: string; title: string; content: string };
+function isPublicKnowledgeEntry(value: unknown): value is PublicKnowledgeEntry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    "title" in value &&
+    typeof value.title === "string" &&
+    "content" in value &&
+    typeof value.content === "string"
+  );
+}
+
 type PublicConfig = {
   welcomeMessage: string;
   fallbackMessage: string;
@@ -41,6 +55,8 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([{ role: "maria", text: DEFAULT_CONFIG.welcomeMessage }]);
   const [input, setInput] = useState("");
   const [inputLanguage, setInputLanguage] = useState("default");
+  const [knowledgeEntries, setKnowledgeEntries] = useState<PublicKnowledgeEntry[]>([]);
+  const [knowledgeStatus, setKnowledgeStatus] = useState<"loading" | "ready" | "error">("loading");
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [thinking, setThinking] = useState(false);
@@ -90,6 +106,34 @@ export default function Home() {
       active = false;
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadKnowledge() {
+      try {
+        const response = await fetch("/api/knowledge", { cache: "no-store" });
+        if (!response.ok) throw new Error(`Knowledge request failed (${response.status})`);
+        const data = await response.json() as { entries?: unknown };
+        const entries = data.entries;
+        if (!Array.isArray(entries) || !entries.every(isPublicKnowledgeEntry)) {
+          throw new Error("Knowledge response was invalid");
+        }
+        if (active) {
+          setKnowledgeEntries(entries);
+          setKnowledgeStatus("ready");
+        }
+      } catch (error) {
+        console.error("Could not load public knowledge", error);
+        if (active) setKnowledgeStatus("error");
+      }
+    }
+
+    void loadKnowledge();
+    return () => {
+      active = false;
     };
   }, []);
 
@@ -344,6 +388,32 @@ export default function Home() {
           <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-[#0b5960]/15 bg-white p-2.5 shadow-sm focus-within:border-[#c49c4f] focus-within:ring-4 focus-within:ring-[#c49c4f]/10"><MapPin className="ml-2 shrink-0 text-[#b68732]" size={19} /><input value={input} onChange={(event) => setInput(event.target.value)} className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-[#71868c]" placeholder="Ask about Siruma…" aria-label="Question for Maria" /><Button type="submit" size="icon-lg" disabled={thinking} className="rounded-xl bg-[#d3a64d] text-[#182d2a] hover:bg-[#e1ba6a]" aria-label="Send question"><Send /></Button></form>
           <p className="mt-4 text-center text-xs text-[#6e8186]">Knowledge-grounded local guidance • Voice: {voiceName}</p>
           {voiceError && <p className="mt-2 text-center text-xs text-rose-700" role="status">{voiceError}</p>}
+        </div>
+      </section>
+
+      <section
+        className="relative z-10 mx-auto max-w-7xl px-5 pb-12 sm:px-8 lg:px-10"
+        aria-labelledby="knowledge-heading"
+      >
+        <div className="rounded-[1.5rem] border border-[#183c37]/10 bg-[#fffdf8] p-5 text-[#182d2a] sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[.2em] text-[#a57424]">Local knowledge</p>
+          <h2 id="knowledge-heading" className="mt-1 font-serif text-3xl">Explore Siruma</h2>
+          <p className="mt-2 text-sm text-[#49636b]">Browse visitor information from Maria’s knowledge base.</p>
+          {knowledgeStatus === "loading" && <p className="mt-5 text-sm text-[#64777d]" role="status">Loading articles…</p>}
+          {knowledgeStatus === "error" && <p className="mt-5 text-sm text-rose-700" role="alert">Knowledge articles are temporarily unavailable. Please try again later.</p>}
+          {knowledgeStatus === "ready" && knowledgeEntries.length === 0 && (
+            <p className="mt-5 text-sm text-[#64777d]">No published knowledge articles are available yet.</p>
+          )}
+          {knowledgeStatus === "ready" && knowledgeEntries.length > 0 && (
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              {knowledgeEntries.map((entry) => (
+                <details key={entry.id} className="rounded-xl border border-[#153743]/10 bg-white p-4">
+                  <summary className="cursor-pointer font-semibold text-[#24434d]">{entry.title}</summary>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[#49636b]">{entry.content}</p>
+                </details>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
