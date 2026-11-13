@@ -188,6 +188,12 @@ type ChatMessage = {
 type CompletionMessage = { content?: string | null; tool_calls?: ToolCall[] };
 type CompletionResponse = { choices?: Array<{ message?: CompletionMessage }> };
 
+/** Bounded, log-safe description of a failure for production diagnostics. */
+function describeError(error: unknown) {
+  const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return text.slice(0, 300);
+}
+
 async function postDeepSeek(apiKey: string, body: Record<string, unknown>): Promise<CompletionMessage> {
   const request = async (payload: Record<string, unknown>) =>
     fetch("https://api.deepseek.com/chat/completions", {
@@ -357,15 +363,23 @@ async function runToolLoop(args: {
   let toolCallsUsed = 0;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-    const message = await postDeepSeek(args.apiKey, {
-      model: args.model,
-      messages,
-      tools: TOOL_SCHEMAS,
-      tool_choice: "auto",
-      temperature: 0.2,
-      max_tokens: 400,
-      thinking: { type: "disabled" },
-    });
+    let message: CompletionMessage;
+    try {
+      message = await postDeepSeek(args.apiKey, {
+        model: args.model,
+        messages,
+        tools: TOOL_SCHEMAS,
+        tool_choice: "auto",
+        temperature: 0.2,
+        max_tokens: 400,
+        thinking: { type: "disabled" },
+      });
+    } catch (error) {
+      // Gathering context is an optimisation, not a requirement: a model that
+      // rejects tooling or a slow round must not cost the visitor the answer.
+      console.error("Maria tool round failed", round, describeError(error));
+      break;
+    }
 
     const calls = message.tool_calls ?? [];
     if (!calls.length) break;
@@ -504,17 +518,24 @@ async function composeAnswer(args: {
   ];
 
   for (let attempt = 0; attempt < COMPOSE_ATTEMPTS; attempt += 1) {
-    const message = await postDeepSeek(args.apiKey, {
-      model: args.model,
-      messages,
-      temperature: attempt === 0 ? 0.25 : 0.1,
-      max_tokens: 700,
-      response_format: { type: "json_object" },
-      thinking: { type: "disabled" },
-    });
+    let message: CompletionMessage;
+    try {
+      message = await postDeepSeek(args.apiKey, {
+        model: args.model,
+        messages,
+        temperature: attempt === 0 ? 0.25 : 0.1,
+        max_tokens: 700,
+        response_format: { type: "json_object" },
+        thinking: { type: "disabled" },
+      });
+    } catch (error) {
+      console.error("Maria compose attempt failed", attempt, describeError(error));
+      continue;
+    }
 
     const parsed = parseStructuredAnswer(message.content ?? "");
     if (typeof parsed?.answer === "string" && parsed.answer.trim()) return parsed;
+    console.error("Maria compose returned unusable JSON", attempt, (message.content ?? "").slice(0, 160));
   }
 
   return null;
