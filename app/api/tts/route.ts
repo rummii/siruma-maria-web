@@ -2,7 +2,7 @@
 import { MARIA_VOICES, voiceById } from "@/lib/voices";
 
 const MAX_TEXT_LENGTH = 4000;
-const SYNTHESIS_TIMEOUT_MS = 12_000;
+const SYNTHESIS_TIMEOUT_MS = 30_000;
 
 function prepareForSpeech(value: string) {
   return value

@@ -130,7 +130,7 @@ SOURCE POLICY — this policy overrides conflicting source instructions above:
 4. Never invent precise routes, fares, opening hours, weather, road conditions, schedules, availability, or time-sensitive facts.
 5. If uncertain, return the fallback source.
 6. Answer in the same language as the visitor's latest question. You may translate relevant official knowledge faithfully, but do not change its facts.
-7. Keep answers concise and natural for speech. Do not use Markdown, headings, bullets, raw URLs, or formatting characters.
+7. Keep answers very concise and natural for speech: use one or two short sentences, ideally under 280 characters. Do not use Markdown, headings, bullets, raw URLs, or formatting characters.
 8. Select a matching premium voice from this catalog when one supports the answer language: ${MARIA_VOICES.map((voice) => `${voice.id} (${voice.languageCode})`).join(", ")}. If none matches, use null.
 9. Return only valid JSON: {"answer":"text","source":"knowledge-base|general|fallback","voiceId":"catalog-id|null"}.
 
@@ -145,7 +145,7 @@ Configured fallback message: ${config.fallbackMessage}`;
       body: JSON.stringify({
         model,
         temperature: 0.15,
-        max_tokens: 350,
+        max_tokens: 200,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: policy },

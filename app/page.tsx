@@ -131,7 +131,7 @@ export default function Home() {
     setVoiceError("");
     setSynthesizing(true);
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    const timeout = window.setTimeout(() => controller.abort(), 35000);
 
     try {
       const response = await fetch("/api/tts", {
