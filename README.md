@@ -48,6 +48,31 @@ Local tool usage metrics are disabled by default. Set `WRANGLER_SEND_METRICS=tru
 - `examples/d1/` contains an optional D1 example surface
 - `drizzle.config.ts` supports local migration generation when needed
 
+
+## Maria Tourism Ambassador
+
+The site in this checkout is a Siruma tourism assistant rather than the bare starter. Two documents matter:
+
+- `ADMIN_BACKEND_SETUP.md` — environment variables, Railway S3 storage, the admin dashboard, and troubleshooting.
+- This section — how Maria decides what to answer.
+
+### How Maria decides what to answer
+
+1. **Siruma facts first.** Anything about Siruma itself — destinations, activities, operators, prices, schedules, boat trips, policies, contacts — must come from the enabled knowledge entries in `maria/knowledge.json`. The knowledge base always beats the web and the model's own knowledge, and Maria says a figure is unconfirmed rather than estimating it.
+2. **Web for travel logistics.** Routes, terminals, transfers, distances, and travel times the knowledge base does not cover are answered with Tavily through `lib/web-search.ts`. Those answers name their source, and every URL shown to a visitor is one the search actually returned.
+3. **General guidance with disclosure.** Harmless travel advice gets a short "not official Siruma information" style disclosure.
+4. **Polite refusal otherwise.** Off-topic requests receive the configured fallback message plus knowledge-base topic suggestions.
+
+Code map:
+
+- `app/api/chat/route.ts` — validates the turn, applies per-IP rate limiting, and degrades to a local answer on any model failure.
+- `lib/maria-agent.ts` — knowledge ranking, the tool loop, JSON composition, citation allowlisting, and the `answer`/`speech` pair.
+- `lib/web-search.ts` — the only place that talks to Tavily; swapping providers means editing this file alone.
+- `lib/rate-limit.ts` — fixed-window chat limit and the global hourly web-search budget.
+- `app/page.tsx` — sends recent conversation history, renders citation links and follow-up suggestions, and speaks the citation-free `speech` text.
+
+Enable web answers by setting `TAVILY_API_KEY`; everything works without it, just without Tier 2.
+
 ## Workspace Auth Headers
 
 Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.

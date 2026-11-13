@@ -12,6 +12,10 @@ type Config = {
   avatarType: "video" | "image";
   responseMode: "text-and-voice" | "voice-only" | "text-only";
   suggestions: string[];
+  webSearchEnabled: boolean;
+  webSearchMaxResults: number;
+  offTopicMode: "fallback" | "brief";
+  maxHistoryTurns: number;
 };
 
 type Voice = { id: string; label: string; languageCode: string };
@@ -290,6 +294,56 @@ export default function AdminPage() {
                 </select>
                 <span className="mt-1 block text-xs text-[#64777d]">Controls how Maria delivers new answers to visitors.</span>
               </Label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Label title="Conversation memory">
+                  <select
+                    value={config.maxHistoryTurns}
+                    onChange={(event) => setConfig({ ...config, maxHistoryTurns: Number(event.target.value) })}
+                    className="admin-input"
+                  >
+                    <option value={0}>No memory — each question stands alone</option>
+                    <option value={3}>Last 3 exchanges</option>
+                    <option value={5}>Last 5 exchanges</option>
+                    <option value={8}>Last 8 exchanges</option>
+                  </select>
+                  <span className="mt-1 block text-xs text-[#64777d]">Lets visitors ask follow-ups like “how much is that?”.</span>
+                </Label>
+                <Label title="Off-topic questions">
+                  <select
+                    value={config.offTopicMode}
+                    onChange={(event) => setConfig({ ...config, offTopicMode: event.target.value as Config["offTopicMode"] })}
+                    className="admin-input"
+                  >
+                    <option value="fallback">Use the fallback message</option>
+                    <option value="brief">Brief redirect with topic suggestions</option>
+                  </select>
+                  <span className="mt-1 block text-xs text-[#64777d]">Applies to questions unrelated to Siruma or travel.</span>
+                </Label>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Label title="Web search for travel logistics">
+                  <select
+                    value={config.webSearchEnabled ? "on" : "off"}
+                    onChange={(event) => setConfig({ ...config, webSearchEnabled: event.target.value === "on" })}
+                    className="admin-input"
+                  >
+                    <option value="on">Enabled — search the web and cite sources</option>
+                    <option value="off">Disabled — knowledge base and general guidance only</option>
+                  </select>
+                  <span className="mt-1 block text-xs text-[#64777d]">Requires TAVILY_API_KEY on Railway. Siruma facts always come from the knowledge base.</span>
+                </Label>
+                <Label title="Web results per search">
+                  <input
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={config.webSearchMaxResults}
+                    onChange={(event) => setConfig({ ...config, webSearchMaxResults: Number(event.target.value) })}
+                    className="admin-input"
+                  />
+                  <span className="mt-1 block text-xs text-[#64777d]">Between 1 and 8. Higher values cost more and lengthen answers.</span>
+                </Label>
+              </div>
               <button disabled={busy} className="rounded-xl bg-[#c99c48] px-5 py-3 font-semibold disabled:opacity-50">Save settings</button>
             </form>
 

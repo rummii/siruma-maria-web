@@ -13,6 +13,12 @@ const NO_CACHE_HEADERS = {
 
 const VOICE_PROVIDER_ALLOWLIST = new Set(["google", "deepgram"]);
 
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
 export async function GET(request: Request) {
   const admin = await requireAdmin(request);
   if (!admin) return unauthorized();
@@ -45,6 +51,14 @@ export async function PUT(request: Request) {
     suggestions: Array.isArray(body.suggestions)
       ? body.suggestions.map(String).map((item) => item.trim()).filter(Boolean).slice(0, 8)
       : current.suggestions,
+    webSearchEnabled:
+      typeof body.webSearchEnabled === "boolean" ? body.webSearchEnabled : current.webSearchEnabled,
+    webSearchMaxResults: clampNumber(body.webSearchMaxResults, 1, 8, current.webSearchMaxResults),
+    offTopicMode:
+      body.offTopicMode === "brief" || body.offTopicMode === "fallback"
+        ? body.offTopicMode
+        : current.offTopicMode,
+    maxHistoryTurns: clampNumber(body.maxHistoryTurns, 0, 8, current.maxHistoryTurns),
   };
   return Response.json({ config: await saveMariaConfig(config) }, { headers: NO_CACHE_HEADERS });
 }

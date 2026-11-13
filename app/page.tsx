@@ -4,7 +4,31 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { Compass, MapPin, Mic, MicOff, Send, Sparkles, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Message = { role: "maria" | "visitor"; text: string };
+type Citation = { title: string; url: string };
+type AnswerSource = "knowledge-base" | "web" | "mixed" | "general" | "fallback";
+type Message = {
+  role: "maria" | "visitor";
+  text: string;
+  source?: AnswerSource;
+  citations?: Citation[];
+  followUps?: string[];
+};
+
+const SOURCE_BADGES: Partial<Record<AnswerSource, string>> = {
+  web: "Web source — not confirmed by Siruma",
+  mixed: "Knowledge base + web sources",
+  general: "General guidance — not official Siruma information",
+};
+
+type BrowserSpeechRecognition = {
+  lang: string;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  start(): void;
+};
 type PublicKnowledgeEntry = { id: string; title: string; content: string };
 function isPublicKnowledgeEntry(value: unknown): value is PublicKnowledgeEntry {
   return (
@@ -238,6 +262,10 @@ export default function Home() {
   async function ask(text: string) {
     const clean = text.trim();
     if (!clean || thinking) return;
+    const history = messages
+      .filter((message) => message.text.trim())
+      .slice(-10)
+      .map((message) => ({ role: message.role, text: message.text }));
     setInput("");
     setVoiceError("");
     setMessages((current) => [...current, { role: "visitor", text: clean }]);
@@ -247,19 +275,35 @@ export default function Home() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: clean }),
+        body: JSON.stringify({ question: clean, history }),
       });
-      const data = (await response.json()) as { answer?: string; error?: string; voiceId?: string | null };
+      const data = (await response.json()) as {
+        answer?: string;
+        speech?: string;
+        error?: string;
+        voiceId?: string | null;
+        source?: AnswerSource;
+        citations?: Citation[];
+        followUps?: string[];
+      };
       const answer = response.ok && data.answer ? data.answer : config.fallbackMessage;
+      const speech = response.ok && data.speech ? data.speech : answer;
+      const meta: Partial<Message> = response.ok && data.answer
+        ? {
+            source: data.source,
+            citations: Array.isArray(data.citations) ? data.citations : [],
+            followUps: Array.isArray(data.followUps) ? data.followUps : [],
+          }
+        : {};
       setVoiceError("");
       if (config.responseMode !== "voice-only") {
-        setMessages((current) => [...current, { role: "maria", text: answer }]);
+        setMessages((current) => [...current, { role: "maria", text: answer, ...meta }]);
       }
       if (config.responseMode !== "text-only") {
         if (data.voiceId === null) {
           setVoiceError("Maria answered in this language, but no matching premium voice is configured.");
         } else {
-          window.setTimeout(() => speak(answer, data.voiceId || config.defaultVoice), 150);
+          window.setTimeout(() => speak(speech, data.voiceId || config.defaultVoice), 150);
         }
       }
     } catch {
@@ -280,7 +324,10 @@ export default function Home() {
   }
 
   function listen() {
-    const speechWindow = window as unknown as { webkitSpeechRecognition?: new () => any; SpeechRecognition?: new () => any };
+    const speechWindow = window as unknown as {
+      webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+      SpeechRecognition?: new () => BrowserSpeechRecognition;
+    };
     const SpeechRecognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setMessages((current) => [...current, { role: "maria", text: "Voice input is not available in this browser yet. You can type your question below." }]);
@@ -292,7 +339,7 @@ export default function Home() {
     recognition.onstart = () => setListening(true);
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
-    recognition.onresult = (event: any) => void ask(event.results[0][0].transcript);
+    recognition.onresult = (event) => void ask(event.results[0][0].transcript);
     recognition.start();
   }
 
@@ -383,10 +430,10 @@ export default function Home() {
             </div>
             <Button onClick={listen} size="icon-lg" aria-label={listening ? "Listening" : "Start voice input"} className={`rounded-full ${listening ? "bg-rose-600 hover:bg-rose-600" : "bg-[#214f49] hover:bg-[#183f3a]"}`}>{listening ? <MicOff /> : <Mic />}</Button>
           </div>
-          <div ref={chatBox} className="scrollbar-thin my-5 min-h-[310px] flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">{messages.map((message, index) => <div key={index} className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed ${message.role === "visitor" ? "rounded-br-md bg-[#214f49] text-white" : "rounded-bl-md border border-[#153743]/10 bg-white text-[#263f47] shadow-sm"}`}>{message.text}</div></div>)}{thinking && <div className="text-sm text-[#64777d]">Maria is thinking…</div>}{!thinking && synthesizing && <div className="text-sm text-[#64777d]" role="status">Preparing your voice answer…</div>}</div>
+          <div ref={chatBox} className="scrollbar-thin my-5 min-h-[310px] flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">{messages.map((message, index) => <div key={index} className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed ${message.role === "visitor" ? "rounded-br-md bg-[#214f49] text-white" : "rounded-bl-md border border-[#153743]/10 bg-white text-[#263f47] shadow-sm"}`}><p className="whitespace-pre-wrap">{message.text}</p>{message.role === "maria" && !!message.citations?.length && <ul className="mt-2 space-y-1 border-t border-[#153743]/10 pt-2">{message.citations.map((citation) => <li key={citation.url}><a href={citation.url} target="_blank" rel="noreferrer noopener" className="text-xs font-semibold text-[#0b5960] underline decoration-[#c49c4f] underline-offset-2">{citation.title || citation.url}</a></li>)}</ul>}{message.role === "maria" && message.source && SOURCE_BADGES[message.source] && <p className="mt-2 text-[11px] font-semibold uppercase tracking-[.12em] text-[#a57424]">{SOURCE_BADGES[message.source]}</p>}{message.role === "maria" && !!message.followUps?.length && <div className="mt-3 flex flex-wrap gap-2">{message.followUps.map((followUp) => <button key={followUp} onClick={() => void ask(followUp)} disabled={thinking} className="rounded-full border border-[#0b5960]/15 bg-[#f7f4ea] px-3 py-1.5 text-xs font-semibold text-[#24434d] transition hover:border-[#c49c4f] hover:bg-[#fff7df] disabled:opacity-50">{followUp}</button>)}</div>}</div></div>)}{thinking && <div className="text-sm text-[#64777d]">Maria is thinking…</div>}{!thinking && synthesizing && <div className="text-sm text-[#64777d]" role="status">Preparing your voice answer…</div>}</div>
           {!!config.suggestions.length && <div className="mb-4"><p className="mb-2 text-xs font-semibold uppercase tracking-[.16em] text-[#77898d]">Popular questions</p><div className="flex gap-2 overflow-x-auto pb-1">{config.suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)} disabled={thinking} className="shrink-0 rounded-full border border-[#0b5960]/15 bg-[#f7f4ea] px-4 py-2.5 text-sm font-semibold text-[#24434d] transition hover:border-[#c49c4f] hover:bg-[#fff7df] disabled:opacity-50">{suggestion}</button>)}</div></div>}
           <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-[#0b5960]/15 bg-white p-2.5 shadow-sm focus-within:border-[#c49c4f] focus-within:ring-4 focus-within:ring-[#c49c4f]/10"><MapPin className="ml-2 shrink-0 text-[#b68732]" size={19} /><input value={input} onChange={(event) => setInput(event.target.value)} className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-[#71868c]" placeholder="Ask about Siruma…" aria-label="Question for Maria" /><Button type="submit" size="icon-lg" disabled={thinking} className="rounded-xl bg-[#d3a64d] text-[#182d2a] hover:bg-[#e1ba6a]" aria-label="Send question"><Send /></Button></form>
-          <p className="mt-4 text-center text-xs text-[#6e8186]">Knowledge-grounded local guidance • Voice: {voiceName}</p>
+          <p className="mt-4 text-center text-xs text-[#6e8186]">Knowledge-first answers, with cited web sources for travel logistics • Voice: {voiceName}</p>
           {voiceError && <p className="mt-2 text-center text-xs text-rose-700" role="status">{voiceError}</p>}
         </div>
       </section>

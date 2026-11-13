@@ -11,6 +11,10 @@ export type MariaConfig = {
   avatarType: "video" | "image";
   responseMode: "text-and-voice" | "voice-only" | "text-only";
   suggestions: string[];
+  webSearchEnabled: boolean;
+  webSearchMaxResults: number;
+  offTopicMode: "fallback" | "brief";
+  maxHistoryTurns: number;
   updatedAt?: string;
 };
 
@@ -28,6 +32,10 @@ export const DEFAULT_CONFIG: MariaConfigWithProvider = {
   avatarType: "video",
   responseMode: "text-and-voice",
   suggestions: ["What can I do in Siruma?", "Tell me about paragliding", "Plan a day trip"],
+  webSearchEnabled: true,
+  webSearchMaxResults: 5,
+  offTopicMode: "fallback",
+  maxHistoryTurns: 5,
 };
 
 export type KnowledgeEntry = {
