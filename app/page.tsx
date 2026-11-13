@@ -137,7 +137,7 @@ export default function Home() {
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId }),
+        body: JSON.stringify({ text, voiceId, fallbackVoiceId: config.defaultVoice }),
         signal: controller.signal,
       });
       if (!response.ok) throw new Error("Premium voice synthesis failed");

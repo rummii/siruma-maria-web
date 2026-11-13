@@ -16,37 +16,17 @@ function prepareForSpeech(value: string) {
 }
 
 async function googleSynthesize(text: string, voiceName: string, languageCode: string, signal: AbortSignal) {
+  const apiKey = process.env.GOOGLE_TTS_API_KEY;
+  if (!apiKey) return null;
+
   const endpoint = new URL("https://texttospeech.googleapis.com/v1/text:synthesize");
   const region = process.env.VERTEX_AI_REGION || "asia-southeast1";
   endpoint.host = `${region}-texttospeech.googleapis.com`;
 
-  let authorization = "";
-  if (process.env.GOOGLE_TTS_API_KEY) {
-    authorization = `X-Goog-Api-Key ${process.env.GOOGLE_TTS_API_KEY}`;
-  } else {
-    // Fall back to the metadata service account (GCE/GKE only) — not available on Railway.
-    try {
-      const tokenResponse = await fetch(
-        "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
-        { headers: { "Metadata-Flavor": "Google" }, cache: "no-store", signal },
-      );
-      if (!tokenResponse.ok) throw new Error("Unable to obtain Google identity token");
-      const tokenData = (await tokenResponse.json()) as { access_token?: string };
-      if (!tokenData.access_token) throw new Error("Google identity token was empty");
-      authorization = `Bearer ${tokenData.access_token}`;
-    } catch {
-      return null;
-    }
-  }
-
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (authorization.startsWith("Bearer ")) headers.Authorization = authorization;
-  else headers["X-Goog-Api-Key"] = authorization.slice("X-Goog-Api-Key ".length);
-
   try {
     const googleResponse = await fetch(endpoint, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey },
       body: JSON.stringify({
         input: { text },
         voice: { languageCode, name: voiceName, ssmlGender: "FEMALE" },
@@ -64,6 +44,12 @@ async function googleSynthesize(text: string, voiceName: string, languageCode: s
     if (signal.aborted) console.error("Google TTS synthesis timed out", { timeoutMs: SYNTHESIS_TIMEOUT_MS });
     return null;
   }
+}
+
+function providerConfigured(provider: "google" | "deepgram") {
+  return provider === "google"
+    ? Boolean(process.env.GOOGLE_TTS_API_KEY)
+    : Boolean(process.env.DEEPGRAM_API_KEY);
 }
 
 async function deepgramSynthesize(text: string, model: string, signal: AbortSignal) {
@@ -92,9 +78,9 @@ async function deepgramSynthesize(text: string, model: string, signal: AbortSign
 }
 
 export async function POST(request: Request) {
-  let body: { text?: unknown; voiceId?: unknown };
+  let body: { text?: unknown; voiceId?: unknown; fallbackVoiceId?: unknown };
   try {
-    body = (await request.json()) as { text?: unknown; voiceId?: unknown };
+    body = (await request.json()) as { text?: unknown; voiceId?: unknown; fallbackVoiceId?: unknown };
   } catch {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -103,7 +89,17 @@ export async function POST(request: Request) {
   if (!text) return Response.json({ error: "Text is required." }, { status: 400 });
   if (text.length > MAX_TEXT_LENGTH) return Response.json({ error: "Text is too long." }, { status: 413 });
 
-  const voice = voiceById(typeof body.voiceId === "string" ? body.voiceId : undefined);
+  const requestedVoice = voiceById(typeof body.voiceId === "string" ? body.voiceId : undefined);
+  const configuredVoice = voiceById(typeof body.fallbackVoiceId === "string" ? body.fallbackVoiceId : undefined);
+  const voice = providerConfigured(requestedVoice.provider) ? requestedVoice : configuredVoice;
+  if (!providerConfigured(voice.provider)) {
+    console.error("No configured TTS provider is available", {
+      requestedProvider: requestedVoice.provider,
+      fallbackProvider: configuredVoice.provider,
+    });
+    return Response.json({ error: "No configured premium voice provider is available." }, { status: 503 });
+  }
+
   const cacheKey = createHash("sha256").update(`${voice.id}::${text}`).digest("hex");
 
   const failures: string[] = [];
@@ -124,13 +120,18 @@ export async function POST(request: Request) {
       if (!audio) failures.push(`deepgram:${voice.name}`);
     }
 
-    // Fallback only to a voice the provider catalog marks as the same language.
+    // Prefer a same-language voice, then the administrator-configured voice.
     if (!audio && !controller.signal.aborted) {
       const alternate = MARIA_VOICES.find(
         (candidate) =>
           candidate.provider !== voice.provider &&
           candidate.languageCode === voice.languageCode &&
-          candidate.id !== voice.id,
+          candidate.id !== voice.id &&
+          providerConfigured(candidate.provider),
+      ) || (
+        configuredVoice.id !== voice.id && providerConfigured(configuredVoice.provider)
+          ? configuredVoice
+          : undefined
       );
       if (alternate) {
         if (alternate.provider === "google") {
