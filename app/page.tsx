@@ -34,6 +34,7 @@ export default function Home() {
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [synthesizing, setSynthesizing] = useState(false);
   const [voiceName, setVoiceName] = useState("Browser US English voice");
   const chatBox = useRef<HTMLDivElement>(null);
   const idleVideo = useRef<HTMLVideoElement>(null);
@@ -137,16 +138,21 @@ export default function Home() {
 
   async function speak(text: string) {
     stopCurrentVoice();
+    setSynthesizing(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12000);
 
     try {
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
+        signal: controller.signal,
       });
       if (!response.ok) throw new Error("Premium voice unavailable");
 
       const audioUrl = URL.createObjectURL(await response.blob());
+      window.clearTimeout(timeout);
       const audio = new Audio(audioUrl);
       generatedAudio.current = audio;
       setVoiceName(response.headers.get("X-Maria-Voice") || "Deepgram Aura 2");
@@ -170,6 +176,9 @@ export default function Home() {
       await audio.play();
     } catch {
       speakWithBrowserVoice(text);
+    } finally {
+      window.clearTimeout(timeout);
+      setSynthesizing(false);
     }
   }
 
@@ -284,7 +293,7 @@ export default function Home() {
               <div className="guide-status mt-5 flex items-center justify-between rounded-xl border border-white/12 p-3.5">
                 <div className="flex items-center gap-3">
                   <div className={`grid size-10 place-items-center rounded-full ${speaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div>
-                  <div><p className="text-sm font-semibold">AI Tourism Ambassador</p><p className="text-xs text-white/55">{speaking ? "Speaking now…" : thinking ? "Preparing an answer…" : "Online and ready"}</p></div>
+                  <div><p className="text-sm font-semibold">AI Tourism Ambassador</p><p className="text-xs text-white/55">{speaking ? "Speaking now…" : thinking ? "Preparing an answer…" : synthesizing ? "Preparing your voice answer…" : "Online and ready"}</p></div>
                 </div>
                 <div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${speaking ? "wave" : ""}`} style={{height}} />)}</div>
               </div>
@@ -301,7 +310,7 @@ export default function Home() {
             </div>
             <Button onClick={listen} size="icon-lg" aria-label={listening ? "Listening" : "Start voice input"} className={`rounded-full ${listening ? "bg-rose-600 hover:bg-rose-600" : "bg-[#214f49] hover:bg-[#183f3a]"}`}>{listening ? <MicOff /> : <Mic />}</Button>
           </div>
-          <div ref={chatBox} className="scrollbar-thin my-5 min-h-[310px] flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">{messages.map((message, index) => <div key={index} className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed ${message.role === "visitor" ? "rounded-br-md bg-[#214f49] text-white" : "rounded-bl-md border border-[#153743]/10 bg-white text-[#263f47] shadow-sm"}`}>{message.text}</div></div>)}{thinking && <div className="text-sm text-[#64777d]">Maria is thinking…</div>}</div>
+          <div ref={chatBox} className="scrollbar-thin my-5 min-h-[310px] flex-1 space-y-4 overflow-y-auto pr-1" aria-live="polite">{messages.map((message, index) => <div key={index} className={`flex ${message.role === "visitor" ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed ${message.role === "visitor" ? "rounded-br-md bg-[#214f49] text-white" : "rounded-bl-md border border-[#153743]/10 bg-white text-[#263f47] shadow-sm"}`}>{message.text}</div></div>)}{thinking && <div className="text-sm text-[#64777d]">Maria is thinking…</div>}{!thinking && synthesizing && <div className="text-sm text-[#64777d]" role="status">Preparing your voice answer…</div>}</div>
           {!!config.suggestions.length && <div className="mb-4"><p className="mb-2 text-xs font-semibold uppercase tracking-[.16em] text-[#77898d]">Popular questions</p><div className="flex gap-2 overflow-x-auto pb-1">{config.suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)} disabled={thinking} className="shrink-0 rounded-full border border-[#0b5960]/15 bg-[#f7f4ea] px-4 py-2.5 text-sm font-semibold text-[#24434d] transition hover:border-[#c49c4f] hover:bg-[#fff7df] disabled:opacity-50">{suggestion}</button>)}</div></div>}
           <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-[#0b5960]/15 bg-white p-2.5 shadow-sm focus-within:border-[#c49c4f] focus-within:ring-4 focus-within:ring-[#c49c4f]/10"><MapPin className="ml-2 shrink-0 text-[#b68732]" size={19} /><input value={input} onChange={(event) => setInput(event.target.value)} className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-[#71868c]" placeholder="Ask about Siruma…" aria-label="Question for Maria" /><Button type="submit" size="icon-lg" disabled={thinking} className="rounded-xl bg-[#d3a64d] text-[#182d2a] hover:bg-[#e1ba6a]" aria-label="Send question"><Send /></Button></form>
           <p className="mt-4 text-center text-xs text-[#6e8186]">Knowledge-grounded local guidance • Voice: {voiceName}</p>
