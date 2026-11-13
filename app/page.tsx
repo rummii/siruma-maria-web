@@ -16,6 +16,15 @@ type PublicConfig = {
   suggestions: string[];
 };
 
+const VOICE_INPUT_LANGUAGES = [
+  { code: "fil-PH", label: "Filipino" },
+  { code: "en-US", label: "English (US)" },
+  { code: "en-GB", label: "English (UK)" },
+  { code: "en-AU", label: "English (Australia)" },
+  { code: "en-IN", label: "English (India)" },
+  { code: "es-US", label: "Spanish" },
+];
+
 const DEFAULT_CONFIG: PublicConfig = {
   welcomeMessage: "Magandang araw! I’m Maria, your AI Tourism Ambassador. How may I help you discover Siruma today?",
   fallbackMessage: "I’m sorry, I don’t have enough information to answer that yet.",
@@ -31,14 +40,17 @@ export default function Home() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [messages, setMessages] = useState<Message[]>([{ role: "maria", text: DEFAULT_CONFIG.welcomeMessage }]);
   const [input, setInput] = useState("");
+  const [inputLanguage, setInputLanguage] = useState("default");
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [synthesizing, setSynthesizing] = useState(false);
-  const [voiceName, setVoiceName] = useState("Browser US English voice");
+  const [voiceError, setVoiceError] = useState("");
+  const [voiceName, setVoiceName] = useState("Premium voice");
   const chatBox = useRef<HTMLDivElement>(null);
   const idleVideo = useRef<HTMLVideoElement>(null);
   const generatedAudio = useRef<HTMLAudioElement | null>(null);
+  const generatedAudioUrl = useRef<string | null>(null);
   const configRef = useRef(DEFAULT_CONFIG);
 
   useEffect(() => {
@@ -97,68 +109,51 @@ export default function Home() {
   useEffect(() => () => {
     generatedAudio.current?.pause();
     generatedAudio.current = null;
-    window.speechSynthesis?.cancel();
+    if (generatedAudioUrl.current) URL.revokeObjectURL(generatedAudioUrl.current);
+    generatedAudioUrl.current = null;
   }, []);
 
   function stopCurrentVoice() {
     if (generatedAudio.current) {
+      generatedAudio.current.onended = null;
+      generatedAudio.current.onerror = null;
       generatedAudio.current.pause();
       generatedAudio.current.src = "";
       generatedAudio.current = null;
     }
-    window.speechSynthesis?.cancel();
+    if (generatedAudioUrl.current) URL.revokeObjectURL(generatedAudioUrl.current);
+    generatedAudioUrl.current = null;
     setSpeaking(false);
   }
 
-  function speakWithBrowserVoice(text: string) {
-    if (!("speechSynthesis" in window)) return;
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = config.defaultLanguage || "en-US";
-    utterance.rate = 0.96;
-    utterance.pitch = 1;
-
-    const language = utterance.lang.toLowerCase();
-    const voices = window.speechSynthesis.getVoices();
-    const preferredNames = /aria|ava|female|jenny|samantha|susan|victoria|zira/i;
-    const voice =
-      voices.find((candidate) =>
-        candidate.lang.toLowerCase() === language && preferredNames.test(candidate.name),
-      ) ||
-      voices.find((candidate) => candidate.lang.toLowerCase() === language) ||
-      voices.find((candidate) => candidate.lang.toLowerCase().startsWith(language.split("-")[0]));
-
-    if (voice) utterance.voice = voice;
-    setVoiceName(voice?.name || `Browser ${utterance.lang} voice`);
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  }
-
-  async function speak(text: string) {
+  async function speak(text: string, voiceId = config.defaultVoice) {
     stopCurrentVoice();
+    setVoiceError("");
     setSynthesizing(true);
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 12000);
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
 
     try {
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voiceId }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error("Premium voice unavailable");
+      if (!response.ok) throw new Error("Premium voice synthesis failed");
 
       const audioUrl = URL.createObjectURL(await response.blob());
       window.clearTimeout(timeout);
       const audio = new Audio(audioUrl);
       generatedAudio.current = audio;
+      generatedAudioUrl.current = audioUrl;
       setVoiceName(response.headers.get("X-Maria-Voice") || "Deepgram Aura 2");
 
       const release = () => {
-        URL.revokeObjectURL(audioUrl);
+        if (generatedAudioUrl.current === audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+          generatedAudioUrl.current = null;
+        }
         if (generatedAudio.current === audio) generatedAudio.current = null;
       };
 
@@ -170,12 +165,26 @@ export default function Home() {
       audio.onerror = () => {
         setSpeaking(false);
         release();
-        speakWithBrowserVoice(text);
+        setVoiceError("Premium voice playback failed. Your answer is still available as text.");
       };
 
       await audio.play();
-    } catch {
-      speakWithBrowserVoice(text);
+    } catch (error) {
+      if (generatedAudio.current) {
+        generatedAudio.current.pause();
+        generatedAudio.current.src = "";
+        generatedAudio.current = null;
+      }
+      if (generatedAudioUrl.current) {
+        URL.revokeObjectURL(generatedAudioUrl.current);
+        generatedAudioUrl.current = null;
+      }
+      setVoiceError(
+        controller.signal.aborted
+          ? "Premium voice took too long to respond. Your answer is still available as text."
+          : "Premium voice is unavailable. Your answer is still available as text.",
+      );
+      console.error("Maria premium voice playback failed", error);
     } finally {
       window.clearTimeout(timeout);
       setSynthesizing(false);
@@ -186,6 +195,7 @@ export default function Home() {
     const clean = text.trim();
     if (!clean || thinking) return;
     setInput("");
+    setVoiceError("");
     setMessages((current) => [...current, { role: "visitor", text: clean }]);
     setThinking(true);
 
@@ -195,13 +205,18 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: clean }),
       });
-      const data = (await response.json()) as { answer?: string; error?: string };
+      const data = (await response.json()) as { answer?: string; error?: string; voiceId?: string | null };
       const answer = response.ok && data.answer ? data.answer : config.fallbackMessage;
+      setVoiceError("");
       if (config.responseMode !== "voice-only") {
         setMessages((current) => [...current, { role: "maria", text: answer }]);
       }
       if (config.responseMode !== "text-only") {
-        window.setTimeout(() => speak(answer), 150);
+        if (data.voiceId === null) {
+          setVoiceError("Maria answered in this language, but no matching premium voice is configured.");
+        } else {
+          window.setTimeout(() => speak(answer, data.voiceId || config.defaultVoice), 150);
+        }
       }
     } catch {
       if (config.responseMode !== "voice-only") {
@@ -228,7 +243,7 @@ export default function Home() {
       return;
     }
     const recognition = new SpeechRecognition();
-    recognition.lang = config.defaultLanguage;
+    recognition.lang = inputLanguage === "default" ? config.defaultLanguage : inputLanguage;
     recognition.interimResults = false;
     recognition.onstart = () => setListening(true);
     recognition.onend = () => setListening(false);
@@ -306,7 +321,21 @@ export default function Home() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[.2em] text-[#a57424]">Plan your visit</p>
               <p className="mt-1 font-serif text-3xl">Ask Maria</p>
-              <p className="mt-1 text-sm text-[#49636b]">Speak naturally or type a question</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <p className="text-sm text-[#49636b]">Speak naturally or type a question</p>
+                <label className="sr-only" htmlFor="voice-input-language">Voice input language</label>
+                <select
+                  id="voice-input-language"
+                  value={inputLanguage}
+                  onChange={(event) => setInputLanguage(event.target.value)}
+                  className="rounded-md border border-[#153743]/15 bg-white px-2 py-1 text-xs text-[#49636b]"
+                >
+                  <option value="default">Default ({config.defaultLanguage})</option>
+                  {VOICE_INPUT_LANGUAGES.map(({ code, label }) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <Button onClick={listen} size="icon-lg" aria-label={listening ? "Listening" : "Start voice input"} className={`rounded-full ${listening ? "bg-rose-600 hover:bg-rose-600" : "bg-[#214f49] hover:bg-[#183f3a]"}`}>{listening ? <MicOff /> : <Mic />}</Button>
           </div>
@@ -314,6 +343,7 @@ export default function Home() {
           {!!config.suggestions.length && <div className="mb-4"><p className="mb-2 text-xs font-semibold uppercase tracking-[.16em] text-[#77898d]">Popular questions</p><div className="flex gap-2 overflow-x-auto pb-1">{config.suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)} disabled={thinking} className="shrink-0 rounded-full border border-[#0b5960]/15 bg-[#f7f4ea] px-4 py-2.5 text-sm font-semibold text-[#24434d] transition hover:border-[#c49c4f] hover:bg-[#fff7df] disabled:opacity-50">{suggestion}</button>)}</div></div>}
           <form onSubmit={submit} className="flex items-center gap-2 rounded-2xl border border-[#0b5960]/15 bg-white p-2.5 shadow-sm focus-within:border-[#c49c4f] focus-within:ring-4 focus-within:ring-[#c49c4f]/10"><MapPin className="ml-2 shrink-0 text-[#b68732]" size={19} /><input value={input} onChange={(event) => setInput(event.target.value)} className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-base outline-none placeholder:text-[#71868c]" placeholder="Ask about Siruma…" aria-label="Question for Maria" /><Button type="submit" size="icon-lg" disabled={thinking} className="rounded-xl bg-[#d3a64d] text-[#182d2a] hover:bg-[#e1ba6a]" aria-label="Send question"><Send /></Button></form>
           <p className="mt-4 text-center text-xs text-[#6e8186]">Knowledge-grounded local guidance • Voice: {voiceName}</p>
+          {voiceError && <p className="mt-2 text-center text-xs text-rose-700" role="status">{voiceError}</p>}
         </div>
       </section>
 

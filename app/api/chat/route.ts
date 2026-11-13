@@ -1,11 +1,11 @@
 import { getMariaConfig, listKnowledge, type KnowledgeEntry } from "@/lib/maria-store";
+import { MARIA_VOICES } from "@/lib/voices";
 
 const MAX_QUESTION_LENGTH = 1000;
-const GENERAL_DISCLOSURE = "Based on general travel information, ";
 
 type AnswerSource = "knowledge-base" | "general" | "fallback";
 type DeepSeekResponse = { choices?: Array<{ message?: { content?: string } }> };
-type StructuredAnswer = { answer?: string; source?: AnswerSource };
+type StructuredAnswer = { answer?: string; source?: AnswerSource; voiceId?: string | null };
 
 function parseStructuredAnswer(raw: string): StructuredAnswer | null {
   const cleaned = raw.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "").trim();
@@ -20,7 +20,7 @@ function normalizeKnowledgeKey(value: string) {
   return value
     .normalize("NFKC")
     .toLocaleLowerCase()
-    .replace(/[^\\p{L}\\p{N}]+/gu, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
@@ -55,6 +55,29 @@ function localKnowledgeMatch(question: string, entries: KnowledgeEntry[]) {
     : null;
 }
 
+function relevantKnowledge(question: string, entries: KnowledgeEntry[], limit = 5) {
+  const queryWords = words(question);
+  if (!queryWords.length) return entries;
+
+  const ranked = entries
+    .map((entry) => {
+      const title = new Set(words(entry.title));
+      const content = new Set(words(entry.content));
+      const score = queryWords.reduce(
+        (total, word) => total + (title.has(word) ? 4 : 0) + (content.has(word) ? 1 : 0),
+        0,
+      );
+      return { entry, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((left, right) => right.score - left.score);
+  const threshold = Math.max(2, Math.ceil(queryWords.length * 0.4));
+  const matches = ranked.filter(({ score }) => score >= threshold).slice(0, limit);
+
+  // Keep the full knowledge base available for questions in languages not used by its entries.
+  return matches.length ? matches.map(({ entry }) => entry) : entries;
+}
+
 export async function POST(request: Request) {
   let question = "";
   try {
@@ -70,29 +93,30 @@ export async function POST(request: Request) {
   try {
     const [config, entries] = await Promise.all([getMariaConfig(), listKnowledge()]);
     const enabledEntries = entries.filter((entry) => entry.enabled);
-    const exactMatch = enabledEntries.find(
-      (entry) => normalizeKnowledgeKey(entry.title) === normalizeKnowledgeKey(question),
-    );
-
-    if (exactMatch?.content.trim()) {
-      return Response.json({
-        answer: exactMatch.content.trim(),
-        source: "knowledge-base" satisfies AnswerSource,
-        matchedEntry: exactMatch.id,
-      });
-    }
-
     const apiKey = process.env.DEEPSEEK_API_KEY || "";
     if (!apiKey) {
+      const exactMatch = enabledEntries.find(
+        (entry) => normalizeKnowledgeKey(entry.title) === normalizeKnowledgeKey(question),
+      );
+      if (exactMatch?.content.trim()) {
+        return Response.json({
+          answer: exactMatch.content.trim(),
+          source: "knowledge-base" satisfies AnswerSource,
+          matchedEntry: exactMatch.id,
+          voiceId: config.defaultVoice,
+        });
+      }
+
       const match = localKnowledgeMatch(question, enabledEntries);
       return Response.json(
         match
-          ? { answer: match.content.trim(), source: "knowledge-base" satisfies AnswerSource, matchedEntry: match.id }
-          : { answer: config.fallbackMessage, source: "fallback" satisfies AnswerSource },
+          ? { answer: match.content.trim(), source: "knowledge-base" satisfies AnswerSource, matchedEntry: match.id, voiceId: config.defaultVoice }
+          : { answer: config.fallbackMessage, source: "fallback" satisfies AnswerSource, voiceId: config.defaultVoice },
       );
     }
 
-    const knowledge = enabledEntries
+    const selectedEntries = relevantKnowledge(question, enabledEntries);
+    const knowledge = selectedEntries
       .map((entry) => `Title: ${entry.title}\nContent: ${entry.content}`)
       .join("\n\n");
 
@@ -102,11 +126,13 @@ export async function POST(request: Request) {
 SOURCE POLICY — this policy overrides conflicting source instructions above:
 1. Use the OFFICIAL KNOWLEDGE BASE first. It is authoritative and overrides general knowledge.
 2. Questions about Siruma products, services, prices, bookings, availability, schedules, policies, contacts, safety rules, official claims, or other business details must be answered only from the official knowledge base. If absent, return the fallback source.
-3. For non-commercial visitor questions not answered by the knowledge base, you may use cautious general travel knowledge and mark the source as general.
+3. For non-commercial visitor questions not answered by the knowledge base, you may use cautious general travel knowledge, begin with a brief disclosure translated into the visitor's language, and mark the source as general.
 4. Never invent precise routes, fares, opening hours, weather, road conditions, schedules, availability, or time-sensitive facts.
 5. If uncertain, return the fallback source.
-6. Keep answers concise and natural for speech. Do not use Markdown, headings, bullets, raw URLs, or formatting characters.
-7. Return only valid JSON: {"answer":"text","source":"knowledge-base|general|fallback"}.
+6. Answer in the same language as the visitor's latest question. You may translate relevant official knowledge faithfully, but do not change its facts.
+7. Keep answers concise and natural for speech. Do not use Markdown, headings, bullets, raw URLs, or formatting characters.
+8. Select a matching premium voice from this catalog when one supports the answer language: ${MARIA_VOICES.map((voice) => `${voice.id} (${voice.languageCode})`).join(", ")}. If none matches, use null.
+9. Return only valid JSON: {"answer":"text","source":"knowledge-base|general|fallback","voiceId":"catalog-id|null"}.
 
 Configured fallback message: ${config.fallbackMessage}`;
 
@@ -143,22 +169,36 @@ Configured fallback message: ${config.fallbackMessage}`;
     const structured = parseStructuredAnswer(result.choices?.[0]?.message?.content?.trim() || "");
 
     if (!structured?.answer || structured.source === "fallback") {
-      return Response.json({ answer: config.fallbackMessage, source: "fallback" satisfies AnswerSource });
+      return Response.json({ answer: config.fallbackMessage, source: "fallback" satisfies AnswerSource, voiceId: config.defaultVoice });
     }
 
+    const voiceId = typeof structured.voiceId === "string" &&
+      MARIA_VOICES.some((voice) => voice.id === structured.voiceId)
+      ? structured.voiceId
+      : null;
+
     if (structured.source === "general") {
-      const answer = structured.answer.replace(/^Based on general travel information,\s*/i, "").trim();
+      const answer = structured.answer.trim();
       return Response.json({
-        answer: answer ? `${GENERAL_DISCLOSURE}${answer}` : config.fallbackMessage,
+        answer: answer || config.fallbackMessage,
         source: answer ? "general" : "fallback",
+        voiceId: answer ? voiceId : config.defaultVoice,
       });
     }
 
     if (structured.source !== "knowledge-base") {
-      return Response.json({ answer: config.fallbackMessage, source: "fallback" satisfies AnswerSource });
+      return Response.json({
+        answer: config.fallbackMessage,
+        source: "fallback" satisfies AnswerSource,
+        voiceId: config.defaultVoice,
+      });
     }
 
-    return Response.json({ answer: structured.answer.trim(), source: "knowledge-base" satisfies AnswerSource });
+    return Response.json({
+      answer: structured.answer.trim(),
+      source: "knowledge-base" satisfies AnswerSource,
+      voiceId,
+    });
   } catch (error) {
     console.error("Maria chat failed", error);
     return Response.json({ error: "Maria is temporarily unavailable" }, { status: 503 });

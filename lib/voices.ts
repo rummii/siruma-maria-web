@@ -7,6 +7,8 @@ export type MariaVoice = {
   provider: "google" | "deepgram";
 };
 
+export const DEFAULT_MARIA_VOICE_ID = "us-female";
+
 export const MARIA_VOICES: MariaVoice[] = [
   { id: "filipino-female", label: "Filipino — Female (Deepgram Aura-2)", languageCode: "fil-PH", name: "aura-2-amalthea-en", gender: "FEMALE", provider: "deepgram" },
   { id: "us-female-hd", label: "English (US) — Female (Chirp 3: HD)", languageCode: "en-US", name: "en-US-Chirp3-HD-Aoede", gender: "FEMALE", provider: "google" },
@@ -18,5 +20,7 @@ export const MARIA_VOICES: MariaVoice[] = [
 ];
 
 export function voiceById(id?: string) {
-  return MARIA_VOICES.find((voice) => voice.id === id) || MARIA_VOICES[0];
+  return MARIA_VOICES.find((voice) => voice.id === id) ||
+    MARIA_VOICES.find((voice) => voice.id === DEFAULT_MARIA_VOICE_ID) ||
+    MARIA_VOICES[0];
 }

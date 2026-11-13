@@ -2,7 +2,7 @@
 import { MARIA_VOICES, voiceById } from "@/lib/voices";
 
 const MAX_TEXT_LENGTH = 4000;
-const SYNTHESIS_TIMEOUT_MS = 30_000;
+const SYNTHESIS_TIMEOUT_MS = 12_000;
 
 function prepareForSpeech(value: string) {
   return value
@@ -15,7 +15,7 @@ function prepareForSpeech(value: string) {
     .trim();
 }
 
-async function googleSynthesize(text: string, voiceName: string, languageCode: string) {
+async function googleSynthesize(text: string, voiceName: string, languageCode: string, signal: AbortSignal) {
   const endpoint = new URL("https://texttospeech.googleapis.com/v1/text:synthesize");
   const region = process.env.VERTEX_AI_REGION || "asia-southeast1";
   endpoint.host = `${region}-texttospeech.googleapis.com`;
@@ -28,7 +28,7 @@ async function googleSynthesize(text: string, voiceName: string, languageCode: s
     try {
       const tokenResponse = await fetch(
         "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
-        { headers: { "Metadata-Flavor": "Google" }, cache: "no-store" },
+        { headers: { "Metadata-Flavor": "Google" }, cache: "no-store", signal },
       );
       if (!tokenResponse.ok) throw new Error("Unable to obtain Google identity token");
       const tokenData = (await tokenResponse.json()) as { access_token?: string };
@@ -43,8 +43,6 @@ async function googleSynthesize(text: string, voiceName: string, languageCode: s
   if (authorization.startsWith("Bearer ")) headers.Authorization = authorization;
   else headers["X-Goog-Api-Key"] = authorization.slice("X-Goog-Api-Key ".length);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
   try {
     const googleResponse = await fetch(endpoint, {
       method: "POST",
@@ -55,22 +53,20 @@ async function googleSynthesize(text: string, voiceName: string, languageCode: s
         audioConfig: { audioEncoding: "MP3", speakingRate: 0.96 },
       }),
       cache: "no-store",
-      signal: controller.signal,
+      signal,
     });
 
     if (!googleResponse.ok) return null;
     const data = (await googleResponse.json()) as { audioContent?: string };
     if (!data.audioContent) return null;
     return Buffer.from(data.audioContent, "base64");
-  } catch (error) {
-    if (controller.signal.aborted) console.error("Google TTS synthesis timed out", { timeoutMs: SYNTHESIS_TIMEOUT_MS });
+  } catch {
+    if (signal.aborted) console.error("Google TTS synthesis timed out", { timeoutMs: SYNTHESIS_TIMEOUT_MS });
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
-async function deepgramSynthesize(text: string, model: string) {
+async function deepgramSynthesize(text: string, model: string, signal: AbortSignal) {
   const apiKey = process.env.DEEPGRAM_API_KEY;
   if (!apiKey) return null;
 
@@ -78,24 +74,20 @@ async function deepgramSynthesize(text: string, model: string) {
   endpoint.searchParams.set("model", model);
   endpoint.searchParams.set("encoding", "mp3");
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
   try {
     const upstream = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Token ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
       cache: "no-store",
-      signal: controller.signal,
+      signal,
     });
 
     if (!upstream.ok || !upstream.body) return null;
     return Buffer.from(await upstream.arrayBuffer());
-  } catch (error) {
-    if (controller.signal.aborted) console.error("Deepgram TTS synthesis timed out", { timeoutMs: SYNTHESIS_TIMEOUT_MS });
+  } catch {
+    if (signal.aborted) console.error("Deepgram TTS synthesis timed out", { timeoutMs: SYNTHESIS_TIMEOUT_MS });
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -120,34 +112,40 @@ export async function POST(request: Request) {
   let audio: Buffer | null = null;
   let provider = voice.provider;
   let model = voice.name;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SYNTHESIS_TIMEOUT_MS);
 
-  if (voice.provider === "google") {
-    audio = await googleSynthesize(text, voice.name, voice.languageCode);
-    if (!audio) failures.push(`google:${voice.name}`);
-  } else {
-    audio = await deepgramSynthesize(text, voice.name);
-    if (!audio) failures.push(`deepgram:${voice.name}`);
-  }
+  try {
+    if (voice.provider === "google") {
+      audio = await googleSynthesize(text, voice.name, voice.languageCode, controller.signal);
+      if (!audio) failures.push(`google:${voice.name}`);
+    } else {
+      audio = await deepgramSynthesize(text, voice.name, controller.signal);
+      if (!audio) failures.push(`deepgram:${voice.name}`);
+    }
 
-  // Fallback: try the other provider with a same-language voice before giving up.
-  if (!audio) {
-    const alternate = MARIA_VOICES.find(
-      (candidate) =>
-        candidate.provider !== voice.provider &&
-        candidate.languageCode === voice.languageCode &&
-        candidate.id !== voice.id,
-    );
-    if (alternate) {
-      if (alternate.provider === "google") {
-        audio = await googleSynthesize(text, alternate.name, alternate.languageCode);
-        if (audio) { provider = "google"; model = alternate.name; }
-        else failures.push(`google:${alternate.name}`);
-      } else {
-        audio = await deepgramSynthesize(text, alternate.name);
-        if (audio) { provider = "deepgram"; model = alternate.name; }
-        else failures.push(`deepgram:${alternate.name}`);
+    // Fallback only to a voice the provider catalog marks as the same language.
+    if (!audio && !controller.signal.aborted) {
+      const alternate = MARIA_VOICES.find(
+        (candidate) =>
+          candidate.provider !== voice.provider &&
+          candidate.languageCode === voice.languageCode &&
+          candidate.id !== voice.id,
+      );
+      if (alternate) {
+        if (alternate.provider === "google") {
+          audio = await googleSynthesize(text, alternate.name, alternate.languageCode, controller.signal);
+          if (audio) { provider = "google"; model = alternate.name; }
+          else failures.push(`google:${alternate.name}`);
+        } else {
+          audio = await deepgramSynthesize(text, alternate.name, controller.signal);
+          if (audio) { provider = "deepgram"; model = alternate.name; }
+          else failures.push(`deepgram:${alternate.name}`);
+        }
       }
     }
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (!audio) {
