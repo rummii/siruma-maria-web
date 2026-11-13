@@ -14,6 +14,16 @@ function prepareForSpeech(value: string) {
     .trim();
 }
 
+async function fetchWithTimeout(input: string | URL, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function googleSynthesize(text: string, voiceName: string, languageCode: string) {
   const endpoint = new URL("https://texttospeech.googleapis.com/v1/text:synthesize");
   const region = process.env.VERTEX_AI_REGION || "asia-southeast1";
@@ -25,9 +35,10 @@ async function googleSynthesize(text: string, voiceName: string, languageCode: s
   } else {
     // Fall back to the metadata service account (GCE/GKE only) — not available on Railway.
     try {
-      const tokenResponse = await fetch(
+      const tokenResponse = await fetchWithTimeout(
         "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
         { headers: { "Metadata-Flavor": "Google" }, cache: "no-store" },
+        3000,
       );
       if (!tokenResponse.ok) throw new Error("Unable to obtain Google identity token");
       const tokenData = (await tokenResponse.json()) as { access_token?: string };
@@ -42,16 +53,25 @@ async function googleSynthesize(text: string, voiceName: string, languageCode: s
   if (authorization.startsWith("Bearer ")) headers.Authorization = authorization;
   else headers["X-Goog-Api-Key"] = authorization.slice("X-Goog-Api-Key ".length);
 
-  const googleResponse = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      input: { text },
-      voice: { languageCode, name: voiceName, ssmlGender: "FEMALE" },
-      audioConfig: { audioEncoding: "MP3", speakingRate: 0.96 },
-    }),
-    cache: "no-store",
-  });
+  let googleResponse: Response;
+  try {
+    googleResponse = await fetchWithTimeout(
+      endpoint,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          input: { text },
+          voice: { languageCode, name: voiceName, ssmlGender: "FEMALE" },
+          audioConfig: { audioEncoding: "MP3", speakingRate: 0.96 },
+        }),
+        cache: "no-store",
+      },
+      30000,
+    );
+  } catch {
+    return null;
+  }
 
   if (!googleResponse.ok) return null;
   const data = (await googleResponse.json()) as { audioContent?: string };
@@ -67,15 +87,25 @@ async function deepgramSynthesize(text: string, model: string) {
   endpoint.searchParams.set("model", model);
   endpoint.searchParams.set("encoding", "mp3");
 
-  const upstream = await fetch(endpoint, {
-    method: "POST",
-    headers: { Authorization: `Token ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-    cache: "no-store",
-  });
+  // Keep the timer active through the body read so a stalled stream is also capped.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const upstream = await fetch(endpoint, {
+      method: "POST",
+      headers: { Authorization: `Token ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
 
-  if (!upstream.ok || !upstream.body) return null;
-  return Buffer.from(await upstream.arrayBuffer());
+    if (!upstream.ok || !upstream.body) return null;
+    return Buffer.from(await upstream.arrayBuffer());
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function POST(request: Request) {
@@ -95,38 +125,43 @@ export async function POST(request: Request) {
 
   const failures: string[] = [];
 
-  // Primary: the configured provider for this voice.
+  // Ordered candidates: the primary voice first, then deduplicated fallbacks.
+  // Deepgram is the preferred fallback, so Deepgram candidates come before Google.
+  const candidates: (typeof voice)[] = [voice];
+  const addCandidate = (candidate: typeof voice | undefined) => {
+    if (candidate && !candidates.some((existing) => existing.id === candidate.id)) {
+      candidates.push(candidate);
+    }
+  };
+
+  const deepgramVoice = MARIA_VOICES.find((candidate) => candidate.provider === "deepgram");
+  const alternate = MARIA_VOICES.find(
+    (candidate) =>
+      candidate.provider !== voice.provider &&
+      candidate.languageCode === voice.languageCode &&
+      candidate.id !== voice.id,
+  );
+
+  addCandidate(deepgramVoice);
+  addCandidate(alternate);
+
   let audio: Buffer | null = null;
   let provider = voice.provider;
   let model = voice.name;
 
-  if (voice.provider === "google") {
-    audio = await googleSynthesize(text, voice.name, voice.languageCode);
-    if (!audio) failures.push(`google:${voice.name}`);
-  } else {
-    audio = await deepgramSynthesize(text, voice.name);
-    if (!audio) failures.push(`deepgram:${voice.name}`);
-  }
-
-  // Fallback: try the other provider with a same-language voice before giving up.
-  if (!audio) {
-    const alternate = MARIA_VOICES.find(
-      (candidate) =>
-        candidate.provider !== voice.provider &&
-        candidate.languageCode === voice.languageCode &&
-        candidate.id !== voice.id,
-    );
-    if (alternate) {
-      if (alternate.provider === "google") {
-        audio = await googleSynthesize(text, alternate.name, alternate.languageCode);
-        if (audio) { provider = "google"; model = alternate.name; }
-        else failures.push(`google:${alternate.name}`);
-      } else {
-        audio = await deepgramSynthesize(text, alternate.name);
-        if (audio) { provider = "deepgram"; model = alternate.name; }
-        else failures.push(`deepgram:${alternate.name}`);
-      }
+  for (const candidate of candidates) {
+    if (candidate.provider === "google") {
+      audio = await googleSynthesize(text, candidate.name, candidate.languageCode);
+    } else {
+      audio = await deepgramSynthesize(text, candidate.name);
     }
+
+    if (audio) {
+      provider = candidate.provider;
+      model = candidate.name;
+      break;
+    }
+    failures.push(`${candidate.provider}:${candidate.name}`);
   }
 
   if (!audio) {
