@@ -282,6 +282,9 @@ export default function Home() {
   async function ask(text: string) {
     const clean = text.trim();
     if (!clean || thinking) return;
+    // Open the Anam session while the answer is generated, so the first reply is
+    // already spoken by the avatar rather than falling back to the premium voice.
+    if (configRef.current.anamEnabled) void anam.connect().catch(() => undefined);
     const history = messages
       .filter((message) => message.text.trim())
       .slice(-10)
