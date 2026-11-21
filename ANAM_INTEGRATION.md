@@ -74,9 +74,10 @@ The Maria persona already exists in **SPS ASEAN's Organization**:
 | Name | Maria — Siruma |
 | LLM | **`CUSTOMER_CLIENT_V1`** (Anam's brain disabled — required) |
 | Avatar | `282aeb00-a69c-4e86-9620-4943f8313ebe` — built from `public/maria-cgi-approved.png` |
-| Avatar model | `cara-4.1-express` |
-| Voice | `9132e16e-4fc0-11f1-84b0-52bacf74fa75` — “Angel - Welcoming Host” (Cartesia Sonic-3.6, PH) |
-| Language | `tl` (Filipino) |
+| Avatar model | `cara-4-latest` |
+| Voice | `8cc80a30-4fc0-11f1-84b0-52bacf74fa75` — “Dana - Balanced Spirit” (Cartesia Sonic-3.6, US) |
+| Language | `en` |
+| Director notes | `presetStyle: "playful"`, `expressivity: 0.7`, dynamic cues on |
 | Greeting | skipped — the app drives every utterance via `talk()` |
 
 The custom avatar was generated from the live production asset
