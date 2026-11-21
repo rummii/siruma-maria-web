@@ -1,11 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AnamEvent, MessageRole, createClient } from "@anam-ai/js-sdk";
+import type { AnamClient, Message } from "@anam-ai/js-sdk";
 
 export type AnamStatus = "idle" | "connecting" | "ready" | "error";
 
-type AnamClient = ReturnType<typeof createClient>;
+/**
+ * The SDK is loaded in the browser only, on first use.
+ * A static import pulls it into the server/SSR build graph and stalls `next build`.
+ */
+let sdkPromise: Promise<typeof import("@anam-ai/js-sdk")> | null = null;
+function loadAnamSdk() {
+  if (!sdkPromise) sdkPromise = import("@anam-ai/js-sdk");
+  return sdkPromise;
+}
 
 /**
  * Streams the Maria Anam persona into a <video> element and lets the app push
@@ -43,11 +51,12 @@ export function useAnamMaria(videoElementId: string) {
       const data = (await response.json()) as { sessionToken?: string };
       if (!data.sessionToken) throw new Error("Anam session token was missing");
 
+      const { createClient, AnamEvent, MessageRole } = await loadAnamSdk();
       const client = createClient(data.sessionToken);
 
       // MESSAGE_HISTORY_UPDATED fires when a persona turn completes, which is the
       // only reliable "finished speaking" signal the SDK exposes.
-      client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, (messages) => {
+      client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, (messages: Message[]) => {
         const last = messages[messages.length - 1];
         if (last && last.role === MessageRole.PERSONA) setSpeaking(false);
       });
@@ -99,3 +108,4 @@ export function useAnamMaria(videoElementId: string) {
     disconnect,
   };
 }
+
