@@ -1,4 +1,5 @@
-import { createAnamSessionToken, isAnamConfigured } from "@/lib/anam";
+import { createAnamSessionToken, isAnamConfigured, resolveAnamPersonaId } from "@/lib/anam";
+import { getMariaConfig } from "@/lib/maria-store";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,7 +23,23 @@ export async function POST() {
   }
 
   try {
-    const sessionToken = await createAnamSessionToken();
+    const config = await getMariaConfig();
+    if (!config.anamEnabled) {
+      return Response.json(
+        { error: "The live avatar is disabled in Maria's settings." },
+        { status: 503, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    const personaId = resolveAnamPersonaId(config.anamPersonaId);
+    if (!personaId) {
+      return Response.json(
+        { error: "No Anam persona is configured." },
+        { status: 503, headers: NO_STORE_HEADERS },
+      );
+    }
+
+    const sessionToken = await createAnamSessionToken(personaId);
     return Response.json({ sessionToken }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("Anam session token failed", error);
@@ -32,3 +49,4 @@ export async function POST() {
     );
   }
 }
+

@@ -9,6 +9,10 @@ export type MariaConfig = {
   defaultLanguage: string;
   avatarObject: string;
   avatarType: "video" | "image";
+  /** Use the Anam live avatar for speech. Still requires ANAM_API_KEY on the server. */
+  anamEnabled: boolean;
+  /** Anam persona UUID. Empty falls back to the ANAM_PERSONA_ID environment value. */
+  anamPersonaId: string;
   responseMode: "text-and-voice" | "voice-only" | "text-only";
   suggestions: string[];
   webSearchEnabled: boolean;
@@ -30,6 +34,8 @@ export const DEFAULT_CONFIG: MariaConfigWithProvider = {
   defaultLanguage: "en-US",
   avatarObject: "",
   avatarType: "video",
+  anamEnabled: true,
+  anamPersonaId: "",
   responseMode: "text-and-voice",
   suggestions: ["What can I do in Siruma?", "Tell me about paragliding", "Plan a day trip"],
   webSearchEnabled: true,

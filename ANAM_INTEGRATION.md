@@ -46,7 +46,25 @@ Set these on the deployment (Railway) — **never in the repository**.
 Anam is **optional by design**: if either variable is missing, `anamEnabled` is `false`
 and the app keeps using the existing Google/Deepgram pipeline. No deployment breaks.
 
+## Admin controls (dashboard at `/admin`)
+
+The dashboard manages the Anam side of Maria. Values are stored with the rest of the config in Railway object storage:
+
+| Setting | Field | Meaning |
+| --- | --- | --- |
+| Live avatar toggle | `anamEnabled` | Off forces the Google/Deepgram path even when Anam is fully configured |
+| Anam persona | `anamPersonaId` | Blank means “use the deployment default `ANAM_PERSONA_ID`” |
+
+New endpoint: **`GET /api/admin/anam`** (admin-authenticated)
+
+- Lists the organization’s personas with name, avatar image, **voice model name/provider/country**.
+- Fetches the selected persona in full, because the Anam list endpoint omits `llmId` — the dashboard needs it to warn when a persona is *not* `CUSTOMER_CLIENT_V1`.
+- Degrades gracefully: a missing or rejected API key returns the error string instead of throwing, and the persona ID can still be pasted by hand.
+
+`/api/config` reports `anamEnabled` as true only when **all three** hold: an API key exists, the admin toggle is on, and a persona resolves (admin value or env fallback). Anything less falls back to the premium TTS voice.
+
 ## Creating the Maria persona
+
 
 The Maria persona already exists in **SPS ASEAN's Organization**:
 

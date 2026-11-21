@@ -45,6 +45,11 @@ export async function PUT(request: Request) {
     defaultLanguage: String(body.defaultLanguage || current.defaultLanguage).slice(0, 20),
     avatarObject: current.avatarObject,
     avatarType: body.avatarType === "image" ? "image" : "video",
+    anamEnabled: typeof body.anamEnabled === "boolean" ? body.anamEnabled : current.anamEnabled,
+    anamPersonaId:
+      typeof body.anamPersonaId === "string"
+        ? body.anamPersonaId.trim().slice(0, 64)
+        : current.anamPersonaId,
     responseMode: ["text-and-voice", "voice-only", "text-only"].includes(String(body.responseMode))
       ? (body.responseMode as MariaConfigWithProvider["responseMode"])
       : current.responseMode,

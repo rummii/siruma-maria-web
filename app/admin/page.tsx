@@ -10,6 +10,8 @@ type Config = {
   defaultVoice: string;
   defaultLanguage: string;
   avatarType: "video" | "image";
+  anamEnabled: boolean;
+  anamPersonaId: string;
   responseMode: "text-and-voice" | "voice-only" | "text-only";
   suggestions: string[];
   webSearchEnabled: boolean;
@@ -19,6 +21,24 @@ type Config = {
 };
 
 type Voice = { id: string; label: string; languageCode: string };
+type AnamPersona = {
+  id: string;
+  name: string;
+  description: string;
+  avatarName: string | null;
+  avatarImageUrl: string | null;
+  voiceName: string | null;
+  voiceProvider: string | null;
+  voiceCountry: string | null;
+  llmId: string | null;
+};
+type AnamInfo = {
+  keyPresent: boolean;
+  envPersonaId: string;
+  resolvedPersonaId: string;
+  error: string | null;
+  detailError: string | null;
+};
 type Entry = { id: string; title: string; content: string; enabled: boolean };
 
 declare global {
@@ -42,6 +62,9 @@ export default function AdminPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [config, setConfig] = useState<Config | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
+  const [anamPersonas, setAnamPersonas] = useState<AnamPersona[]>([]);
+  const [anamDetail, setAnamDetail] = useState<AnamPersona | null>(null);
+  const [anamInfo, setAnamInfo] = useState<AnamInfo | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [knowledge, setKnowledge] = useState({ id: "", title: "", content: "", enabled: true });
   const [deleteId, setDeleteId] = useState("");
@@ -107,6 +130,43 @@ export default function AdminPage() {
   useEffect(() => {
     if (token) void loadDashboard();
   }, [token, loadDashboard]);
+
+  const hasConfig = Boolean(config);
+  const anamPersonaId = config?.anamPersonaId ?? "";
+
+  useEffect(() => {
+    if (!token || !hasConfig) return;
+    let active = true;
+    const query = anamPersonaId ? `?personaId=${encodeURIComponent(anamPersonaId)}` : "";
+    api(`/api/admin/anam${query}`)
+      .then((data) => {
+        if (!active) return;
+        setAnamPersonas(Array.isArray(data.personas) ? (data.personas as AnamPersona[]) : []);
+        setAnamDetail((data.detail as AnamPersona) ?? null);
+        setAnamInfo({
+          keyPresent: Boolean(data.keyPresent),
+          envPersonaId: String(data.envPersonaId || ""),
+          resolvedPersonaId: String(data.resolvedPersonaId || ""),
+          error: (data.error as string) ?? null,
+          detailError: (data.detailError as string) ?? null,
+        });
+      })
+      .catch((error) => {
+        if (!active) return;
+        setAnamPersonas([]);
+        setAnamDetail(null);
+        setAnamInfo({
+          keyPresent: false,
+          envPersonaId: "",
+          resolvedPersonaId: "",
+          error: error instanceof Error ? error.message : "Unable to load Anam models",
+          detailError: null,
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, token, hasConfig, anamPersonaId]);
 
   useEffect(() => {
     if (googleReady && clientId && !token) initializeGoogle();
@@ -294,6 +354,95 @@ export default function AdminPage() {
                 </select>
                 <span className="mt-1 block text-xs text-[#64777d]">Controls how Maria delivers new answers to visitors.</span>
               </Label>
+              <div className="space-y-3 rounded-2xl border border-[#0b3947]/15 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Anam live avatar (speech model)</p>
+                    <p className="mt-1 text-xs text-[#64777d]">
+                      When enabled, Maria’s answers are spoken by the Anam persona below, using that
+                      persona’s own avatar and voice model. The voice selected above is then only the
+                      fallback when Anam is unavailable.
+                    </p>
+                  </div>
+                  <label className="flex shrink-0 items-center gap-2 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={config.anamEnabled}
+                      onChange={(event) => setConfig({ ...config, anamEnabled: event.target.checked })}
+                    />
+                    Enabled
+                  </label>
+                </div>
+
+                {anamInfo && !anamInfo.keyPresent && (
+                  <p className="text-xs text-rose-700">
+                    ANAM_API_KEY is not set on this deployment, so the live avatar cannot start.
+                  </p>
+                )}
+                {anamInfo?.error && <p className="text-xs text-rose-700">{anamInfo.error}</p>}
+
+                <Label title="Anam persona">
+                  <select
+                    value={config.anamPersonaId}
+                    onChange={(event) => setConfig({ ...config, anamPersonaId: event.target.value })}
+                    className="admin-input"
+                  >
+                    <option value="">
+                      Deployment default
+                      {anamInfo?.envPersonaId ? ` (${anamInfo.envPersonaId.slice(0, 8)}…)` : " (not set)"}
+                    </option>
+                    {anamPersonas.map((persona) => (
+                      <option key={persona.id} value={persona.id}>{persona.name}</option>
+                    ))}
+                  </select>
+                </Label>
+
+                {anamDetail ? (
+                  <div className="flex gap-3 rounded-xl bg-[#f6f1e8] p-3">
+                    {anamDetail.avatarImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={anamDetail.avatarImageUrl}
+                        alt=""
+                        className="h-16 w-16 rounded-lg object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 text-xs text-[#3f5a60]">
+                      <p className="truncate font-semibold text-[#182d2a]">{anamDetail.name}</p>
+                      <p className="mt-0.5">
+                        Voice model: {anamDetail.voiceName || "—"}
+                        {anamDetail.voiceProvider ? ` · ${anamDetail.voiceProvider}` : ""}
+                        {anamDetail.voiceCountry ? ` · ${anamDetail.voiceCountry}` : ""}
+                      </p>
+                      <p className="mt-0.5">Avatar model: {anamDetail.avatarName || "—"}</p>
+                      <p
+                        className={`mt-0.5 font-semibold ${
+                          anamDetail.llmId === "CUSTOMER_CLIENT_V1" ? "text-emerald-700" : "text-rose-700"
+                        }`}
+                      >
+                        LLM: {anamDetail.llmId || "unknown"}
+                        {anamDetail.llmId === "CUSTOMER_CLIENT_V1"
+                          ? " ✓"
+                          : " — must be CUSTOMER_CLIENT_V1 or the avatar will talk over Maria’s answers"}
+                      </p>
+                    </div>
+                  </div>
+                ) : anamInfo?.detailError ? (
+                  <p className="text-xs text-rose-700">{anamInfo.detailError}</p>
+                ) : null}
+
+                <Label title="Or paste a persona ID">
+                  <input
+                    value={config.anamPersonaId}
+                    onChange={(event) => setConfig({ ...config, anamPersonaId: event.target.value })}
+                    placeholder="7fa2225a-0fc2-464f-9468-175a13390d9a"
+                    className="admin-input"
+                  />
+                  <span className="mt-1 block text-xs text-[#64777d]">
+                    Leave blank to use the deployment default.
+                  </span>
+                </Label>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Label title="Conversation memory">
                   <select
