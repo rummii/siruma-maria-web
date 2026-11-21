@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Compass, MapPin, Mic, MicOff, Send, Sparkles, Volume2 } from "lucide-react";
+import { MapPin, Mic, MicOff, Send, Sparkles, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAnamMaria } from "@/hooks/use-anam-maria";
 
 type Citation = { title: string; url: string };
 type AnswerSource = "knowledge-base" | "web" | "mixed" | "general" | "fallback";
@@ -51,6 +52,8 @@ type PublicConfig = {
   avatarUrl: string;
   avatarType: "video" | "image";
   responseMode: "text-and-voice" | "voice-only" | "text-only";
+  /** True when the deployment has Anam credentials; the live avatar replaces TTS. */
+  anamEnabled: boolean;
   suggestions: string[];
 };
 
@@ -71,6 +74,7 @@ const DEFAULT_CONFIG: PublicConfig = {
   avatarUrl: "/maria-veo-idle.mp4",
   avatarType: "video",
   responseMode: "text-and-voice",
+  anamEnabled: false,
   suggestions: ["What can I do in Siruma?", "Tell me about paragliding", "Plan a day trip"],
 };
 
@@ -92,6 +96,9 @@ export default function Home() {
   const generatedAudio = useRef<HTMLAudioElement | null>(null);
   const generatedAudioUrl = useRef<string | null>(null);
   const configRef = useRef(DEFAULT_CONFIG);
+  const anam = useAnamMaria("maria-anam-video");
+  // Either the Anam avatar or the premium TTS audio can be speaking.
+  const isSpeaking = speaking || anam.speaking;
 
   useEffect(() => {
     let active = true;
@@ -195,6 +202,19 @@ export default function Home() {
   }
 
   async function speak(text: string, voiceId = config.defaultVoice) {
+    // Preferred path: Anam avatar lip-syncs the answer our own LLM produced.
+    if (configRef.current.anamEnabled) {
+      try {
+        setVoiceError("");
+        setVoiceName("Anam live avatar");
+        await anam.say(text);
+        return;
+      } catch (error) {
+        console.error("Anam speech failed, falling back to premium TTS", error);
+        setVoiceError("Live avatar unavailable — using the premium voice instead.");
+      }
+    }
+
     stopCurrentVoice();
     setVoiceError("");
     setSynthesizing(true);
@@ -345,39 +365,6 @@ export default function Home() {
 
   return (
     <main className="travel-shell min-h-screen text-[#182d2a]">
-      <header className="travel-hero">
-        <div className="travel-hero-image" aria-hidden="true" />
-        <div className="relative z-10 mx-auto max-w-7xl px-5 pb-16 pt-6 sm:px-8 lg:px-10 lg:pb-24">
-          <nav className="flex items-center justify-between text-white">
-            <div className="flex items-center gap-3">
-              <div className="brand-mark grid size-10 place-items-center rounded-full border border-white/40 text-[#f4d38a]">
-                <Compass size={22} />
-              </div>
-              <div>
-                <p className="font-serif text-2xl leading-none">Siruma</p>
-                <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/70">Digital Tourism Center</p>
-              </div>
-            </div>
-            <div className="hero-status flex items-center gap-2 text-xs font-semibold uppercase tracking-[.12em] text-white/90">
-              <span className="size-2 rounded-full bg-emerald-300" /> Maria is ready
-            </div>
-          </nav>
-
-          <div className="mt-16 max-w-3xl text-white sm:mt-20 lg:mt-24">
-            <p className="hero-eyebrow mb-5 text-xs font-semibold uppercase tracking-[.24em] text-[#f4d38a]">Camarines Sur · Philippines</p>
-            <h1 className="hero-title font-serif text-4xl leading-[.98] sm:text-5xl lg:text-6xl">Discover the quiet beauty of Siruma.</h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-white/82 sm:text-lg">
-              Wild coastlines, rolling hills, and local adventures—made easier with Maria, your digital tourism guide.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-2 text-sm">
-              <span className="travel-pill">Coastal escapes</span>
-              <span className="travel-pill">Nature adventures</span>
-              <span className="travel-pill">Plan with Maria</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <section className="travel-content relative z-20 mx-auto grid max-w-7xl items-start gap-6 px-5 py-10 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:px-10 lg:py-14">
         <aside className="lg:sticky lg:top-6">
           <div className="maria-guide-card relative min-h-[570px] overflow-hidden rounded-[1.5rem] bg-[#193b38]">
@@ -385,7 +372,9 @@ export default function Home() {
               <Sparkles size={14} /> Your local guide
             </div>
             <div className="maria-cgi-frame" aria-label="Maria, the Siruma AI Tourism Ambassador">
-              {config.avatarType === "video" ? (
+              {config.anamEnabled ? (
+                <video id="maria-anam-video" className="maria-cgi-portrait maria-cgi-video" poster="/maria-cgi-approved.png" autoPlay playsInline aria-hidden="true" />
+              ) : config.avatarType === "video" ? (
                 <video key={config.avatarUrl} ref={idleVideo} className="maria-cgi-portrait maria-cgi-video" src={config.avatarUrl} poster="/maria-cgi-approved.png" autoPlay muted loop playsInline preload="auto" aria-hidden="true" />
               ) : (
                 <img className="maria-cgi-portrait" src={config.avatarUrl} alt="Maria, the Siruma AI Tourism Ambassador" />
@@ -398,10 +387,10 @@ export default function Home() {
               <p className="mt-2 max-w-sm text-sm leading-relaxed text-white/72">A warm, multilingual guide ready to help you discover Siruma’s places, stories, and experiences.</p>
               <div className="guide-status mt-5 flex items-center justify-between rounded-xl border border-white/12 p-3.5">
                 <div className="flex items-center gap-3">
-                  <div className={`grid size-10 place-items-center rounded-full ${speaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div>
-                  <div><p className="text-sm font-semibold">AI Tourism Ambassador</p><p className="text-xs text-white/55">{speaking ? "Speaking now…" : thinking ? "Preparing an answer…" : synthesizing ? "Preparing your voice answer…" : "Online and ready"}</p></div>
+                  <div className={`grid size-10 place-items-center rounded-full ${isSpeaking ? "bg-[#d8b56b] text-[#09232d]" : "bg-white/10 text-[#f2cf82]"}`}><Volume2 size={19} /></div>
+                  <div><p className="text-sm font-semibold">AI Tourism Ambassador</p><p className="text-xs text-white/55">{isSpeaking ? "Speaking now…" : thinking ? "Preparing an answer…" : synthesizing ? "Preparing your voice answer…" : "Online and ready"}</p></div>
                 </div>
-                <div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${speaking ? "wave" : ""}`} style={{height}} />)}</div>
+                <div className="hidden items-center gap-1.5 sm:flex">{[11,20,15,24,13].map((height, i) => <span key={i} className={`w-1 rounded-full bg-[#e4c477] ${isSpeaking ? "wave" : ""}`} style={{height}} />)}</div>
               </div>
             </div>
           </div>

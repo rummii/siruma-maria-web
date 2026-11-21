@@ -1,6 +1,7 @@
 ﻿import { getMariaConfig, listKnowledge } from "@/lib/maria-store";
 import { MARIA_VOICES } from "@/lib/voices";
 import { getRailwayObject } from "@/lib/railway-storage";
+import { isAnamConfigured } from "@/lib/anam";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,6 +25,8 @@ export async function GET() {
     return Response.json(
       {
         ...config,
+        anamEnabled: isAnamConfigured(),
+
         suggestions,
         avatarUrl: config.avatarObject
           ? `/api/avatar?updated=${encodeURIComponent(config.updatedAt || "")}`
